@@ -8,6 +8,13 @@
       "when": 1785262974595,
       "tag": "0000_chief_ma_gnuci",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1785282544909,
+      "tag": "0001_futuristic_husk",
+      "breakpoints": true
     }
   ]
 }

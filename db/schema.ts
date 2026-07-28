@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const questions = sqliteTable("questions", {
   id: text("id").primaryKey(),
@@ -20,8 +20,10 @@ export const votes = sqliteTable("votes", {
   parentRippleId: text("parent_ripple_id"),
   regionCode: text("region_code"),
   consentVersion: text("consent_version").notNull(),
+  voterKey: text("voter_key"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 }, (table) => [
   index("votes_question_idx").on(table.questionId),
   index("votes_ripple_idx").on(table.rippleId),
+  uniqueIndex("votes_voter_idx").on(table.questionId, table.voterKey),
 ]);

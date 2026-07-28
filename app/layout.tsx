@@ -19,18 +19,18 @@ export async function generateMetadata(): Promise<Metadata> {
   const protocol = host.includes("localhost") ? "http" : "https";
   const base = `${protocol}://${host}`;
   return {
-    title: "Ripple — See what your circle really thinks",
-    description: "Vote first. See the split. Start a ripple.",
+    title: "Pollrr — Vote first. See the split.",
+    description: "One question. One tap. See what your circle really thinks.",
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
     openGraph: {
-      title: "Ripple — See what your circle really thinks",
-      description: "Vote before you see the split.",
+      title: "Pollrr — Vote first. See the split.",
+      description: "One question. One tap. See what your circle really thinks.",
       images: [{ url: `${base}/og.png`, width: 1200, height: 630 }],
     },
     twitter: {
       card: "summary_large_image",
-      title: "Ripple — See what your circle really thinks",
-      description: "Vote before you see the split.",
+      title: "Pollrr — Vote first. See the split.",
+      description: "One question. One tap. See what your circle really thinks.",
       images: [`${base}/og.png`],
     },
   };
