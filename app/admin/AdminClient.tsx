@@ -48,6 +48,12 @@ export default function AdminClient({ displayName }: { displayName:string }) {
   useEffect(()=>{const timer=setTimeout(load,0);return()=>clearTimeout(timer)},[load]);
 
   const sections=manage?.platform?["Platform",...baseSections]:baseSections;
+  const navGroups=[
+    {label:"Workspace",items:sections.filter(item=>["Platform","Overview","Campaigns","Polls"].includes(item))},
+    {label:"Reach",items:sections.filter(item=>["Audiences","Distribution","Integrations"].includes(item))},
+    {label:"Intelligence",items:sections.filter(item=>["Reports","Integrity"].includes(item))},
+    {label:"Organization",items:sections.filter(item=>item==="Team")},
+  ];
   const openModal=(kind:Modal,values:Record<string,string>={})=>{
     setForm({
       campaignId:workspace?.campaigns[0]?.id||"",questionId:workspace?.questions[0]?.id||"",
@@ -88,8 +94,9 @@ export default function AdminClient({ displayName }: { displayName:string }) {
   return <main className="admin-shell modern-admin">
     <aside className="sidebar">
       <Link className="brand admin-brand" href="/"><span className="brand-mark">p</span><span>pollrr</span></Link>
-      <div className="org-switch"><small>ORGANIZATION</small><b>{workspace?.organization.name||"Loading…"}</b><span>{workspace?.organization.role||"member"}</span></div>
-      <nav>{sections.map((item)=><button className={active===item?"active":""} onClick={()=>setActive(item)} key={item}><span className="nav-icon">{navIcon(item)}</span>{item}{item==="Campaigns"&&<em>{workspace?.campaigns.length||0}</em>}</button>)}</nav>
+      <div className="org-switch"><span className="org-swatch">{workspace?.organization.name?.slice(0,1)||"P"}</span><div><small>ACTIVE SPACE</small><b>{workspace?.organization.name||"Loading…"}</b><span>{workspace?.organization.role||"member"}</span></div><i>⌄</i></div>
+      <nav className="studio-nav">{navGroups.map(group=><div className="nav-group" key={group.label}><p>{group.label}</p>{group.items.map((item)=><button className={active===item?"active":""} onClick={()=>setActive(item)} key={item}><span className={`nav-marker marker-${item.toLowerCase()}`}/><span>{item}</span>{item==="Campaigns"&&<em>{workspace?.campaigns.length||0}</em>}</button>)}</div>)}</nav>
+      <button className="sidebar-create" onClick={()=>openModal("poll")}><span>＋</span><div><b>Quick poll</b><small>Start a new question</small></div></button>
       <div className="sidebar-bottom"><div className="admin-user"><span>{displayName.slice(0,2).toUpperCase()}</span><div><b>{displayName}</b><small>{manage?.platform?"Platform administrator":workspace?.organization.role||"Member"}</small></div></div></div>
     </aside>
     <section className="admin-main">
@@ -128,7 +135,6 @@ export default function AdminClient({ displayName }: { displayName:string }) {
   </main>;
 }
 
-function navIcon(item:string){return ({Platform:"◆",Overview:"⌂",Campaigns:"▣",Polls:"●",Audiences:"◎",Distribution:"↗",Reports:"▥",Integrity:"◇",Team:"♙",Integrations:"⌁"} as Record<string,string>)[item]}
 function primaryAction(active:string):Modal{return ({Platform:"organization",Campaigns:"campaign",Polls:"poll",Audiences:"audience",Distribution:"link",Reports:"report",Team:"member",Integrations:"integration"} as Record<string,Modal>)[active]||"campaign"}
 function primaryLabel(active:string){return ({Platform:"New client",Campaigns:"New campaign",Polls:"New poll",Audiences:"New audience",Distribution:"New distribution",Reports:"New report",Team:"Invite member",Integrations:"Add integration"} as Record<string,string>)[active]||"New campaign"}
 function stringify(value:object){return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,String(v??"")]))}
