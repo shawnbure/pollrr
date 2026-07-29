@@ -52,3 +52,18 @@ test("contact collection is explicit and structurally separated from votes", asy
   assert.match(privacy, /separate contact vault/);
   assert.match(privacy, /stores no vote identifier, answer, question identifier, or device identifier/);
 });
+
+test("free creator product is simple while platform intelligence remains super-user only", async () => {
+  const creator = await read("app/admin/CreatorClient.tsx");
+  for (const section of ["home", "create", "polls", "results", "account"]) {
+    assert.match(creator, new RegExp(`"${section}"`));
+  }
+  assert.doesNotMatch(creator, /Campaigns|Audiences|Fieldwork|Client administration/);
+  assert.match(creator, /Free forever\. No response limits/);
+  assert.match(creator, /Nightly results/);
+  const page = await read("app/admin/page.tsx");
+  assert.match(page, /query\.mode==="platform"&&platform/);
+  const migration = await read("drizzle/0006_creator_product.sql");
+  assert.match(migration, /creator_preferences/);
+  assert.match(migration, /nightly_results/);
+});

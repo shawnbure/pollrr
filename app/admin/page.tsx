@@ -1,12 +1,13 @@
 import { requireChatGPTUser } from "../chatgpt-auth";
 import AdminClient from "./AdminClient";
+import CreatorClient from "./CreatorClient";
 import { env } from "cloudflare:workers";
-import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminPage() {
+export default async function AdminPage({searchParams}:{searchParams:Promise<{mode?:string}>}) {
   const user = await requireChatGPTUser("/admin");
+  const query=await searchParams;
   const invitation = await env.DB.prepare(
     "SELECT status FROM organization_members WHERE email=? LIMIT 1",
   ).bind(user.email).first<{ status: string }>();
@@ -14,10 +15,7 @@ export default async function AdminPage() {
     await env.DB.prepare("UPDATE organization_members SET status='active' WHERE email=? AND status='invited'")
       .bind(user.email).run();
   }
-  const access = await env.DB.prepare(
-    `SELECT 'member' access FROM organization_members WHERE email=? AND status='active'
-     UNION ALL SELECT 'platform' access FROM platform_admins WHERE email=? LIMIT 1`,
-  ).bind(user.email, user.email).first();
-  if (!access) return <main className="legal-shell"><article><p className="eyebrow">ACCESS PENDING</p><h1>You are signed in, but not part of a Pollrr workspace.</h1><p>Ask your organization owner to invite {user.email}.</p><Link className="text-link" href="/">Return to Pollrr</Link></article></main>;
-  return <AdminClient displayName={user.displayName} />;
+  const platform=Boolean(await env.DB.prepare("SELECT role FROM platform_admins WHERE email=?").bind(user.email).first());
+  if(query.mode==="platform"&&platform)return <AdminClient displayName={user.displayName}/>;
+  return <CreatorClient displayName={user.email}/>;
 }
