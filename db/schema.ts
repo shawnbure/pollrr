@@ -35,3 +35,61 @@ export const voteGuards = sqliteTable("vote_guards", {
 }, (table) => [
   index("vote_guards_expiry_idx").on(table.expiresAt),
 ]);
+
+export const methodologyVersions = sqliteTable("methodology_versions", {
+  id: text("id").primaryKey(),
+  version: text("version").notNull().unique(),
+  title: text("title").notNull(),
+  samplingMethod: text("sampling_method").notNull(),
+  integrityMethod: text("integrity_method").notNull(),
+  explanationMethod: text("explanation_method").notNull(),
+  modelPolicy: text("model_policy").notNull(),
+  publishedAt: integer("published_at").notNull(),
+});
+
+export const questionReasons = sqliteTable("question_reasons", {
+  id: text("id").primaryKey(),
+  questionId: text("question_id").notNull().references(() => questions.id),
+  label: text("label").notNull(),
+  sortOrder: integer("sort_order").notNull(),
+}, (table) => [index("question_reasons_question_idx").on(table.questionId)]);
+
+export const voteEvents = sqliteTable("vote_events", {
+  id: text("id").primaryKey(),
+  voteId: text("vote_id").notNull().unique().references(() => votes.id),
+  questionId: text("question_id").notNull().references(() => questions.id),
+  payloadHash: text("payload_hash").notNull().unique(),
+  integrityStatus: text("integrity_status").notNull(),
+  integrityReason: text("integrity_reason").notNull(),
+  responseMs: integer("response_ms"),
+  sourceClass: text("source_class").notNull(),
+  createdAt: integer("created_at").notNull(),
+}, (table) => [index("vote_events_question_idx").on(table.questionId, table.createdAt)]);
+
+export const explanations = sqliteTable("explanations", {
+  id: text("id").primaryKey(),
+  voteId: text("vote_id").notNull().unique().references(() => votes.id),
+  questionId: text("question_id").notNull().references(() => questions.id),
+  choice: text("choice").notNull(),
+  reasonId: text("reason_id").references(() => questionReasons.id),
+  explanation: text("explanation"),
+  quoteConsent: integer("quote_consent").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+}, (table) => [index("explanations_question_idx").on(table.questionId, table.choice)]);
+
+export const aggregateSnapshots = sqliteTable("aggregate_snapshots", {
+  id: text("id").primaryKey(),
+  questionId: text("question_id").notNull().references(() => questions.id),
+  methodologyVersion: text("methodology_version").notNull(),
+  humanTotal: integer("human_total").notNull(),
+  humanA: integer("human_a").notNull(),
+  humanB: integer("human_b").notNull(),
+  trustedTotal: integer("trusted_total").notNull(),
+  flaggedTotal: integer("flagged_total").notNull(),
+  merkleRoot: text("merkle_root").notNull(),
+  previousSnapshotHash: text("previous_snapshot_hash"),
+  snapshotHash: text("snapshot_hash").notNull().unique(),
+  signature: text("signature").notNull(),
+  publicKey: text("public_key").notNull(),
+  createdAt: integer("created_at").notNull(),
+}, (table) => [index("aggregate_snapshots_question_idx").on(table.questionId, table.createdAt)]);
