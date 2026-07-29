@@ -213,6 +213,176 @@ button:focus-visible, a:focus-visible, textarea:focus-visible { outline: 3px sol
   .admin-brand { padding:0 20px 0 0}.sidebar nav{display:flex}.sidebar-bottom{display:none}.sidebar button{white-space:nowrap}
   .admin-main{padding:22px 16px}.admin-header{align-items:flex-start}.system-health,.preview-btn{display:none}.live-banner{grid-template-columns:60px 1fr 60px}.live-stat{display:none}.metric-grid{grid-template-columns:1fr 1fr}.question-row{grid-template-columns:65px 1fr 20px}.question-row>span:not(.status),.question-row>em{display:none}
 }
+
+/* Pollrr warm studio — spacious, editorial, and deliberate */
+.modern-admin {
+  --studio-bg: #f5efe4;
+  --studio-card: #fffdf8;
+  --studio-ink: #20212a;
+  --studio-muted: #716e68;
+  --studio-coral: #f36f56;
+  background:
+    radial-gradient(circle at 88% 5%, rgba(243,111,86,.12), transparent 24rem),
+    var(--studio-bg);
+  color: var(--studio-ink);
+  font-size: 16px;
+}
+.modern-admin .sidebar {
+  border: 0;
+  background: #fffaf1;
+  box-shadow: 0 18px 55px rgba(73,54,31,.11);
+}
+.modern-admin .org-switch {
+  grid-template-columns: 46px minmax(0,1fr);
+  border: 0;
+  background: #f1e8da;
+  padding: 14px;
+}
+.modern-admin .org-switch small,.modern-admin .nav-group > p { font-size: 11px; }
+.modern-admin .org-switch b { font-size: 15px; }
+.modern-admin .org-switch div > span { font-size: 12px; }
+.modern-admin .studio-nav .nav-group button {
+  min-height: 48px;
+  font-size: 15px;
+  border: 0;
+}
+.modern-admin .studio-nav .nav-group button.active {
+  background: #252633;
+  box-shadow: 0 8px 22px rgba(32,33,42,.16);
+}
+.modern-admin .admin-header p { font-size: 12px; }
+.modern-admin .admin-header h1 { font-size: clamp(42px,4vw,58px); }
+.modern-admin .panel {
+  border: 0;
+  border-radius: 22px;
+  background: var(--studio-card);
+  box-shadow: 0 12px 32px rgba(73,54,31,.065);
+  padding: 30px;
+}
+.modern-admin .panel-head h2 { font-size: 23px; }
+.modern-admin .panel-head p { font-size: 15px; line-height: 1.45; }
+.modern-admin .metric-grid article {
+  border: 0;
+  border-radius: 22px;
+  background: var(--studio-card);
+  box-shadow: 0 10px 28px rgba(73,54,31,.06);
+}
+.modern-admin .metric-top { font-size: 15px; }
+.modern-admin .metric-grid article > small { font-size: 14px; }
+.modern-admin .workspace-list > div,.modern-admin .campaign-group {
+  border-top: 0;
+  border-bottom: 2px solid #eee5d8;
+  padding-block: 22px;
+}
+.modern-admin .crud-row > div > b,.modern-admin .simple-row b { font-size: 17px; }
+.modern-admin .crud-row small,.modern-admin .simple-row small,
+.modern-admin .crud-row > span,.modern-admin .crud-row > a { font-size: 14px; line-height: 1.5; }
+.modern-admin .header-actions button,.modern-admin .panel-head button,
+.modern-admin .row-actions button,.modern-admin .crud-row > button,.modern-admin .simple-row button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: #eee6da;
+  color: var(--studio-ink);
+  padding: 10px 15px;
+  font-size: 14px;
+}
+.modern-admin .header-actions .new-btn,.modern-admin .modal-actions .continue {
+  background: #252633;
+  color: white;
+}
+.modern-admin .question-modal {
+  background: #fffaf2;
+  border-radius: 28px;
+  padding: 42px;
+}
+.modern-admin .question-modal h2 { font-size: 38px; }
+.modern-admin .question-modal p,.modern-admin .admin-editor > label { font-size: 15px; line-height: 1.5; }
+.modern-admin .admin-editor input,.modern-admin .admin-editor select,.modern-admin .admin-editor textarea {
+  min-height: 56px;
+  border: 2px solid #b8ad9e;
+  border-radius: 15px;
+  background: #fff;
+  padding: 15px 17px;
+  font-size: 17px;
+  box-shadow: 0 2px 0 rgba(64,49,34,.06);
+}
+.modern-admin .admin-editor textarea { min-height: 116px; }
+.choice-cards {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 10px;
+  margin-top: 12px;
+}
+.choice-cards button {
+  min-height: 54px;
+  border: 2px solid #c4b9aa;
+  border-radius: 14px;
+  background: white;
+  color: #56514b;
+  font-size: 15px;
+  font-weight: 800;
+  text-transform: capitalize;
+  cursor: pointer;
+}
+.choice-cards button.selected {
+  border-color: #252633;
+  background: #252633;
+  color: white;
+  box-shadow: 4px 4px 0 #f4a28d;
+}
+.channel-choices { grid-template-columns: repeat(4,1fr); }
+.campaign-group { display: grid; gap: 4px; }
+.campaign-polls {
+  margin: 0 0 4px 106px;
+  padding: 7px 14px;
+  border-radius: 16px;
+  background: #f6efe5;
+}
+.campaign-polls > div {
+  display: grid;
+  grid-template-columns: 78px minmax(220px,1fr) auto auto;
+  gap: 14px;
+  align-items: center;
+  min-height: 55px;
+  border-bottom: 1px solid #dfd4c5;
+}
+.campaign-polls > div:last-child { border-bottom: 0; }
+.campaign-polls button { border: 0; background: transparent; font-weight: 800; cursor: pointer; }
+.audience-principle { background: #fff1e8!important; }
+.audience-principle > span { font-size: 12px; font-weight: 900; letter-spacing: .12em; color: #b94835; }
+.audience-principle h2 { max-width: 850px; margin: 10px 0; font-size: 34px; letter-spacing: -.04em; }
+.audience-principle p { max-width: 900px; margin: 0; font-size: 17px; line-height: 1.6; color: var(--studio-muted); }
+.distribution-hero p { max-width: 760px; color: #d5d2cc; font-size: 16px; line-height: 1.55; }
+.channel-focus { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+.channel-focus article {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 14px;
+  align-items: center;
+  min-height: 145px;
+  padding: 24px;
+  border-radius: 20px;
+  background: #fffaf2;
+  box-shadow: 0 10px 28px rgba(73,54,31,.06);
+}
+.channel-focus article > span { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 15px; background: #f4a28d; font-weight: 900; }
+.channel-focus b,.channel-focus small { display: block; }
+.channel-focus b { font-size: 18px; }
+.channel-focus small { margin-top: 5px; color: var(--studio-muted); line-height: 1.45; }
+.channel-focus strong { grid-column: 2; color: #55813d; font-size: 13px; }
+.empty-note { color: var(--studio-muted); font-size: 15px; }
+
+@media (max-width: 1000px) {
+  .channel-focus { grid-template-columns: 1fr; }
+  .campaign-polls { margin-left: 0; }
+}
+@media (max-width: 720px) {
+  .modern-admin .panel { padding: 22px; }
+  .choice-cards,.channel-choices { grid-template-columns: 1fr 1fr; }
+  .campaign-polls > div { grid-template-columns: 70px 1fr; }
+  .campaign-polls > div span,.campaign-polls > div button { grid-column: 2; }
+}
 @media (max-width: 480px) {
   .question-wrap h1 { font-size: 31px; }
   .result-head h1 { font-size: 27px; }
