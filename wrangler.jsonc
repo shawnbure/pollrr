@@ -9,9 +9,15 @@
     "directory": "dist/client",
     "binding": "ASSETS"
   },
+  "ai": {
+    "binding": "AI"
+  },
   "env": {
     "production": {
       "name": "pollrr-production",
+      "ai": {
+        "binding": "AI"
+      },
       "vars": {
         "LEDGER_PUBLIC_KEY": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAER9QNpnluBp4Dq6bcxrlOTOBfH0LylGCwMuNVFhpqdDhZDgqQHz+HxOej5xYCTq1Q30b4t4tnHsH+nMBAvSbS0A=="
       },
@@ -28,6 +34,9 @@
     },
     "development": {
       "name": "pollrr-development",
+      "ai": {
+        "binding": "AI"
+      },
       "vars": {
         "LEDGER_PUBLIC_KEY": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAER9QNpnluBp4Dq6bcxrlOTOBfH0LylGCwMuNVFhpqdDhZDgqQHz+HxOej5xYCTq1Q30b4t4tnHsH+nMBAvSbS0A=="
       },

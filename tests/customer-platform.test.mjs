@@ -22,11 +22,12 @@ test("public poll supports direct and tracked distribution links", async () => {
 
 test("admin exposes the complete customer operating workflow", async () => {
   const admin = await read("app/admin/AdminClient.tsx");
-  for (const section of ["Campaigns", "Polls", "Samples", "Fieldwork", "Intelligence", "Integrity", "Team"]) {
+  for (const section of ["Polls", "Intelligence", "Integrity", "Team"]) {
     assert.match(admin, new RegExp(`"${section}"`));
   }
   assert.match(admin, /Design → sample → collect → verify → analyze/);
   assert.doesNotMatch(admin, /<Integrations/);
+  assert.doesNotMatch(admin, /label:"Research operations"/);
 });
 
 test("SaaS control plane includes clients, teams, sample imports, reports, and audit history", async () => {
@@ -35,13 +36,14 @@ test("SaaS control plane includes clients, teams, sample imports, reports, and a
     assert.match(migration, new RegExp(`CREATE TABLE \\\`?${table}\\\`?`));
   }
   const admin = await read("app/admin/AdminClient.tsx");
-  assert.match(admin, /Client administration/);
+  assert.match(admin, /Creator accounts/);
   assert.match(admin, /Add sample records/);
   assert.match(admin, /Response trend/);
   assert.match(admin, /Team and access/);
   assert.match(admin, /FIELDWORK CONTROL/);
   assert.match(admin, /Add records/);
-  assert.match(admin, /campaign-polls/);
+  assert.match(admin, /All creator polls/);
+  assert.match(admin, /Every poll across every free creator account/);
 });
 
 test("contact collection is explicit and structurally separated from votes", async () => {
@@ -66,4 +68,34 @@ test("free creator product is simple while platform intelligence remains super-u
   const migration = await read("drizzle/0006_creator_product.sql");
   assert.match(migration, /creator_preferences/);
   assert.match(migration, /nightly_results/);
+  const seed = await read("drizzle/0007_creator_test_account.sql");
+  assert.match(seed, /smb\+creator@workrr\.ai/);
+  assert.match(seed, /Creator Test Account/);
+});
+
+test("Pollrr AI upgrade tools are implemented and entitlement protected", async () => {
+  const ai = await read("app/api/ai/route.ts");
+  for (const action of ["create", "review", "ideas", "summary"]) {
+    assert.match(ai, new RegExp(`action==="${action}"`));
+  }
+  assert.match(ai, /upgradeRequired:true/);
+  assert.match(ai, /Never invent responses/);
+  const creator = await read("app/admin/CreatorClient.tsx");
+  assert.match(creator, /Create poll with AI/);
+  assert.match(creator, /Review neutrality with AI/);
+  assert.match(creator, /Ideas from my history/);
+  assert.match(creator, /Generate AI report/);
+  const wrangler = await read("wrangler.jsonc");
+  assert.match(wrangler, /"binding": "AI"/);
+});
+
+test("super-user poll library supports creator, topic, tag search and sorting", async () => {
+  const admin = await read("app/admin/AdminClient.tsx");
+  assert.match(admin, /Search polls, creators, topics or tags/);
+  assert.match(admin, /All creators/);
+  assert.match(admin, /All topics/);
+  assert.match(admin, /All tags/);
+  assert.match(admin, /Most responses/);
+  const migration = await read("drizzle/0008_poll_tags.sql");
+  assert.match(migration, /ADD `tags`/);
 });

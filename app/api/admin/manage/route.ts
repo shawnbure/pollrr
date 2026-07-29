@@ -43,16 +43,22 @@ export async function GET(request: Request) {
   const requestedOrg = url.searchParams.get("organizationId");
   const organizationId = member.platform_role && requestedOrg ? requestedOrg : member.organization_id;
   if (!organizationId && member.platform_role) {
-    const organizations = await env.DB.prepare(
+    const [organizations,platformPolls] = await Promise.all([env.DB.prepare(
       `SELECT o.*,
         (SELECT COUNT(*) FROM organization_members m WHERE m.organization_id=o.id) members,
         (SELECT COUNT(*) FROM campaigns c WHERE c.organization_id=o.id) campaigns,
         (SELECT COUNT(*) FROM votes v JOIN questions q ON q.id=v.question_id WHERE q.organization_id=o.id) responses
        FROM organizations o ORDER BY o.created_at DESC`,
-    ).all();
-    return Response.json({ platform: true, organizations: organizations.results });
+    ).all(),env.DB.prepare(
+      `SELECT q.id,q.prompt,q.status,q.topic,q.tags,q.created_by,q.created_at,o.name organization_name,
+        COUNT(v.id) responses
+       FROM questions q JOIN organizations o ON o.id=q.organization_id
+       LEFT JOIN votes v ON v.question_id=q.id
+       GROUP BY q.id ORDER BY q.created_at DESC`,
+    ).all()]);
+    return Response.json({ platform:true,organizations:organizations.results,platformPolls:platformPolls.results });
   }
-  const [team, reports, integrations, imports, audienceMetrics, channels, daily, audits, organizations] = await Promise.all([
+  const [team, reports, integrations, imports, audienceMetrics, channels, daily, audits, organizations, platformPolls] = await Promise.all([
     env.DB.prepare("SELECT email,role,status,title,created_at FROM organization_members WHERE organization_id=? ORDER BY created_at").bind(organizationId).all(),
     env.DB.prepare("SELECT * FROM saved_reports WHERE organization_id=? ORDER BY updated_at DESC").bind(organizationId).all(),
     env.DB.prepare("SELECT id,provider,account_label,status,capabilities,updated_at FROM integrations WHERE organization_id=? ORDER BY provider").bind(organizationId).all(),
@@ -88,6 +94,13 @@ export async function GET(request: Request) {
         (SELECT COUNT(*) FROM votes v JOIN questions q ON q.id=v.question_id WHERE q.organization_id=o.id) responses
        FROM organizations o ORDER BY o.created_at DESC`,
     ).all() : Promise.resolve({ results: [] }),
+    member.platform_role ? env.DB.prepare(
+      `SELECT q.id,q.prompt,q.status,q.topic,q.tags,q.created_by,q.created_at,o.name organization_name,
+        COUNT(v.id) responses
+       FROM questions q JOIN organizations o ON o.id=q.organization_id
+       LEFT JOIN votes v ON v.question_id=q.id
+       GROUP BY q.id ORDER BY q.created_at DESC`,
+    ).all() : Promise.resolve({ results: [] }),
   ]);
   return Response.json({
     platform: Boolean(member.platform_role), organizationId, organizations: organizations.results,
@@ -95,6 +108,7 @@ export async function GET(request: Request) {
     imports: imports.results, audienceMetrics: audienceMetrics.results,
     analytics: { channels: channels.results, daily: daily.results },
     audits: audits.results,
+    platformPolls: platformPolls.results,
   });
 }
 
