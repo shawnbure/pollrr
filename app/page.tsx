@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 
 type Choice = "a" | "b";
 type Stage = "loading" | "vote" | "sending" | "queued" | "result" | "empty";
@@ -73,8 +74,9 @@ export default function Home() {
     update();
     window.addEventListener("online", update);
     window.addEventListener("offline", update);
-    loadPoll();
+    const timer = window.setTimeout(loadPoll, 0);
     return () => {
+      window.clearTimeout(timer);
       window.removeEventListener("online", update);
       window.removeEventListener("offline", update);
     };
@@ -86,12 +88,15 @@ export default function Home() {
     if (!raw) return;
     try {
       const pending = JSON.parse(raw) as PendingVote;
-      setChoice(pending.choice);
-      setStage("sending");
-      sendVote(pending).catch(() => {
-        setStage("queued");
-        setMessage("Still trying. Tap to retry.");
-      });
+      const timer = window.setTimeout(() => {
+        setChoice(pending.choice);
+        setStage("sending");
+        sendVote(pending).catch(() => {
+          setStage("queued");
+          setMessage("Still trying. Tap to retry.");
+        });
+      }, 0);
+      return () => window.clearTimeout(timer);
     } catch {
       localStorage.removeItem(PENDING_KEY);
     }
@@ -159,9 +164,9 @@ export default function Home() {
     <main className="public-shell">
       <div className="ambient ambient-one" /><div className="ambient ambient-two" />
       <header className="public-nav">
-        <a className="brand" href="/" aria-label="Pollrr home">
+        <Link className="brand" href="/" aria-label="Pollrr home">
           <span className="brand-mark">p</span><span>pollrr</span>
-        </a>
+        </Link>
         <span className="trust-note"><i /> Anonymous by design</span>
       </header>
 
@@ -225,7 +230,10 @@ export default function Home() {
         )}
       </section>
 
-      <footer className="public-footer"><span>Neutral wording · Aggregate results</span><a href="/admin">Admin</a></footer>
+      <footer className="public-footer">
+        <span>Neutral wording · Aggregate results</span>
+        <nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/admin">Admin</a></nav>
+      </footer>
     </main>
   );
 }

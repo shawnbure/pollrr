@@ -78,6 +78,25 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid vote." }, { status: 400 });
   }
 
+  const ip = request.headers.get("cf-connecting-ip") || "local";
+  const hour = Math.floor(Date.now() / 3_600_000);
+  const guardKey = Array.from(
+    new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${ip}:${hour}`))),
+  ).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  const guard = await env.DB.prepare(
+    `INSERT INTO vote_guards (guard_key, attempts, expires_at)
+     VALUES (?, 1, ?)
+     ON CONFLICT(guard_key) DO UPDATE SET attempts = attempts + 1
+     RETURNING attempts`,
+  ).bind(guardKey, (hour + 2) * 3_600_000).first<{ attempts: number }>();
+
+  if (Number(guard?.attempts ?? 0) > 20) {
+    return Response.json(
+      { error: "Too many attempts. Please try again later." },
+      { status: 429, headers: { "retry-after": "3600" } },
+    );
+  }
+
   const poll = await env.DB.prepare(
     "SELECT id, status FROM questions WHERE id = ? LIMIT 1",
   ).bind(body.questionId).first<{ id: string; status: string }>();

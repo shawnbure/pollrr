@@ -27,3 +27,11 @@ export const votes = sqliteTable("votes", {
   index("votes_ripple_idx").on(table.rippleId),
   uniqueIndex("votes_voter_idx").on(table.questionId, table.voterKey),
 ]);
+
+export const voteGuards = sqliteTable("vote_guards", {
+  guardKey: text("guard_key").primaryKey(),
+  attempts: integer("attempts").notNull().default(0),
+  expiresAt: integer("expires_at").notNull(),
+}, (table) => [
+  index("vote_guards_expiry_idx").on(table.expiresAt),
+]);

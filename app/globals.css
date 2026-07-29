@@ -162,6 +162,15 @@ button:focus-visible, a:focus-visible, textarea:focus-visible { outline: 3px sol
 .modal-backdrop { position:fixed;inset:0;background:rgba(15,16,14,.5);z-index:30;display:grid;place-items:center;padding:20px;backdrop-filter:blur(3px)}
 .question-modal { width:min(560px,100%);background:var(--card);border-radius:18px;padding:31px;position:relative;box-shadow:0 30px 80px rgba(0,0,0,.25)}.modal-close{position:absolute;right:18px;top:15px;border:0;background:transparent;font-size:25px;cursor:pointer}.modal-step{font-size:8px;font-weight:900;letter-spacing:1px;color:var(--coral)}.question-modal h2{font-family:Georgia,serif;font-size:28px;margin:16px 0 7px}.question-modal p{font-size:11px;color:#777;line-height:1.5;max-width:430px}.question-modal textarea{width:100%;min-height:140px;border:1px solid #d7d4ca;border-radius:12px;padding:15px;margin-top:14px;resize:none;font-family:Georgia,serif;font-size:20px;background:white}.modal-meta{display:flex;justify-content:space-between;color:#999;font-size:8px;margin-top:7px}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:24px}.modal-actions button{border:1px solid #d7d4ca;background:white;border-radius:8px;padding:10px 14px;font-size:10px;font-weight:800;cursor:pointer}.modal-actions .continue{background:var(--ink);color:white}
 
+.public-footer nav { display: flex; gap: 18px; }
+.legal-shell { min-height: 100vh; padding: 28px clamp(20px,5vw,72px) 80px; background: #f7f7f2; color: #111; }
+.legal-shell article { max-width: 720px; margin: 72px auto 0; }
+.legal-shell h1 { font-size: clamp(42px,7vw,72px); line-height: .98; letter-spacing: -.055em; margin: 12px 0 42px; }
+.legal-shell h2 { font-size: 21px; margin: 32px 0 8px; }
+.legal-shell p { color: #4e514b; font-size: 17px; line-height: 1.7; }
+.legal-action { margin-top: 24px; border: 0; border-radius: 14px; padding: 15px 20px; background: #111; color: white; font: inherit; font-weight: 700; cursor: pointer; }
+.legal-updated { margin-top: 48px; padding-top: 20px; border-top: 1px solid #d9dbd4; font-size: 14px !important; }
+
 @media (max-width: 1000px) {
   .metric-grid { grid-template-columns: 1fr 1fr; }
   .admin-content-grid { grid-template-columns: 1fr; }

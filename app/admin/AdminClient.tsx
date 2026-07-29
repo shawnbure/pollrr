@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 
 type Question = { id: string; prompt: string; status: string; votes: number };
 type Live = Question & { topic: string; region: string; option_a: number; option_b: number };
@@ -19,7 +20,10 @@ export default function AdminClient({ displayName }: { displayName: string }) {
     if (response.ok) setOverview(await response.json() as Overview);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(load, 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   const toggleLive = async () => {
     if (!overview?.live) return;
@@ -53,7 +57,7 @@ export default function AdminClient({ displayName }: { displayName: string }) {
   return (
     <main className="admin-shell">
       <aside className="sidebar">
-        <a className="brand admin-brand" href="/"><span className="brand-mark">p</span><span>pollrr</span></a>
+        <Link className="brand admin-brand" href="/"><span className="brand-mark">p</span><span>pollrr</span></Link>
         <nav>
           {["Overview", "Questions", "Polls", "Audience", "Reports"].map((item, i) => (
             <button className={active === item ? "active" : ""} onClick={() => setActive(item)} key={item}>
