@@ -1042,7 +1042,10 @@ button, input, select, textarea { min-height: 44px; }
 .welcome-block { background: linear-gradient(135deg,#27253a 0%,#423877 100%); }
 .welcome-block::after { background: #7457f5; box-shadow: -130px 220px 0 #2bd3c4; }
 .welcome-block p,.creator-title p,.create-copy p { color: #7457f5; }
-.welcome-block button,.creator-title > button,.ai-upgrade button,.creator-empty button { background: #a7f3e6; }
+.welcome-block button,.creator-title > button,.ai-upgrade button,.creator-empty button {
+  background:#a7f3e6;
+  color:#242334;
+}
 .creator-stats article,.poll-library > article,.result-report,.account-grid article,.creator-empty {
   background: #fff;
   box-shadow: 0 10px 30px rgba(43,38,80,.06);
