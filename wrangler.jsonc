@@ -1,0 +1,40 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pollrr",
+  "main": "dist/server/index.js",
+  "compatibility_date": "2026-07-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "485a8b721eeb6afa98c6e4071b50fe04",
+  "assets": {
+    "directory": "dist/client",
+    "binding": "ASSETS"
+  },
+  "env": {
+    "production": {
+      "name": "pollrr-production",
+      "routes": [
+        { "pattern": "app.pollrr.com", "custom_domain": true }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "pollrr-production",
+          "database_id": "e8df7a20-360c-4f25-b422-6c64e55f7fe6"
+        }
+      ]
+    },
+    "development": {
+      "name": "pollrr-development",
+      "routes": [
+        { "pattern": "dev.pollrr.com", "custom_domain": true }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "pollrr-development",
+          "database_id": "9899f0ec-1e62-4780-b936-2073e5cd7f25"
+        }
+      ]
+    }
+  }
+}
