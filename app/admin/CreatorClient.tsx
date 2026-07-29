@@ -24,7 +24,9 @@ export default function CreatorClient({displayName}:{displayName:string}) {
     const result=await r.json() as {id?:string;url?:string;error?:string};
     setBusy(false);
     if(!r.ok)return setNotice(result.error||"Could not create that poll.");
-    setForm({prompt:"",optionA:"Yes",optionB:"No",topic:"",tags:"",theme:"paper",isPublic:true});setSelected(result.id||"");await load();setView("polls");setNotice("Your poll is live and ready to share.");
+    let copied=false;
+    if(result.url)try{await navigator.clipboard.writeText(new URL(result.url,window.location.origin).toString());copied=true}catch{}
+    setForm({prompt:"",optionA:"Yes",optionB:"No",topic:"",tags:"",theme:"paper",isPublic:true});setSelected(result.id||"");await load();setView("polls");setNotice(copied?"Your poll is live. The link is copied.":"Your poll is live and ready to share.");
   };
   const copy=async(id:string,platform="universal")=>{
     const url=new URL("/",location.origin);url.searchParams.set("p",id);url.searchParams.set("src",platform);
