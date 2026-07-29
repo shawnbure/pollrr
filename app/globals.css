@@ -170,6 +170,20 @@ button:focus-visible, a:focus-visible, textarea:focus-visible { outline: 3px sol
 .legal-shell p { color: #4e514b; font-size: 17px; line-height: 1.7; }
 .legal-action { margin-top: 24px; border: 0; border-radius: 14px; padding: 15px 20px; background: #111; color: white; font: inherit; font-weight: 700; cursor: pointer; }
 .legal-updated { margin-top: 48px; padding-top: 20px; border-top: 1px solid #d9dbd4; font-size: 14px !important; }
+.private-map-opt { display:flex; align-items:center; justify-content:center; gap:8px; font-size:10px; color:#73756e; margin-top:14px; }
+.explain-box { margin-top:24px; padding:18px; background:#f4f3ed; border-radius:16px; display:grid; gap:10px; text-align:left; }
+.explain-box select,.explain-box textarea { width:100%; border:1px solid #d8d6ce; border-radius:10px; background:white; padding:11px; font:inherit; font-size:12px; }
+.explain-box textarea { min-height:70px; resize:vertical; }
+.explain-box button,.verify-action button,.map-actions button { border:0; background:var(--ink); color:white; border-radius:9px; padding:11px 14px; font-weight:800; cursor:pointer; }
+.explain-box button:disabled,.map-actions button:disabled{opacity:.45}
+.common-ground { margin-top:14px; padding:16px; border:1px solid #cfdca5; background:#f4fadf; border-radius:14px; display:grid; gap:4px; text-align:left; }
+.common-ground span { font-size:9px; font-weight:900; text-transform:uppercase; color:#587118; }.common-ground small{color:#73756e}
+.trust-links { display:flex; flex-wrap:wrap; justify-content:center; gap:14px; margin-top:18px; font-size:10px; font-weight:800; }
+.verify-action { margin:28px 0; padding:20px; border:1px solid #d8d6ce; border-radius:15px; background:white; }.verify-action p{font-size:14px}
+.text-link { display:inline-block; margin-top:24px; font-weight:800; }
+.method-labels { display:grid; grid-template-columns:140px 1fr; gap:10px 20px; padding:20px; background:white; border-radius:14px; margin-top:30px; font-size:14px; }.method-labels span{color:#666}
+.opinion-map { margin-top:30px; }.map-status{display:flex;justify-content:space-between;padding:20px;background:var(--ink);color:white;border-radius:14px}.map-entry{display:grid;grid-template-columns:1fr auto auto;gap:20px;padding:16px 4px;border-bottom:1px solid #ddd}.map-entry small{color:#777}.map-actions{display:flex;gap:10px;margin-top:20px}
+.ledger-panel { margin-bottom:16px; display:grid; gap:12px; }.ledger-panel code{overflow:hidden;text-overflow:ellipsis;color:#6b3dcc;background:#f6f1ff;padding:10px;border-radius:8px}.ledger-panel small{color:#777}.ledger-panel a{font-size:10px;font-weight:800}
 
 @media (max-width: 1000px) {
   .metric-grid { grid-template-columns: 1fr 1fr; }

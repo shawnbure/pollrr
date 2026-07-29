@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 type Choice = "a" | "b";
@@ -14,7 +14,8 @@ type Poll = {
   region: string;
 };
 type Totals = { total: number; optionA: number; optionB: number };
-type PendingVote = { questionId: string; choice: Choice; voterKey: string; rippleId: string };
+type Reason = { id: string; label: string };
+type PendingVote = { questionId: string; choice: Choice; voterKey: string; rippleId: string; responseMs?: number };
 
 const PENDING_KEY = "pollrr:pending-vote";
 const VOTER_KEY = "pollrr:voter-key";
@@ -36,14 +37,22 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [copied, setCopied] = useState(false);
   const [online, setOnline] = useState(true);
+  const [reasons, setReasons] = useState<Reason[]>([]);
+  const [reasonId, setReasonId] = useState("");
+  const [explanation, setExplanation] = useState("");
+  const [explanationSaved, setExplanationSaved] = useState(false);
+  const [privateMap, setPrivateMap] = useState(false);
+  const [commonGround, setCommonGround] = useState<string[]>([]);
+  const startedAt = useRef(0);
 
   const loadPoll = useCallback(async () => {
     try {
       const response = await fetch("/api/poll", { cache: "no-store" });
       if (!response.ok) throw new Error("No live poll");
-      const data = await response.json() as { poll: Poll; totals: Totals };
+      const data = await response.json() as { poll: Poll; reasons: Reason[] };
       setPoll(data.poll);
-      setTotals(data.totals);
+      setReasons(data.reasons ?? []);
+      startedAt.current = Date.now();
       setStage("vote");
     } catch {
       setStage("empty");
@@ -66,6 +75,13 @@ export default function Home() {
     setChoice(data.choice ?? pending.choice);
     setTotals(data.totals);
     setStage("result");
+    if (localStorage.getItem("pollrr:private-map") === "yes") {
+      const history = JSON.parse(localStorage.getItem("pollrr:opinion-history") || "[]") as object[];
+      if (!history.some((item) => (item as { questionId?: string }).questionId === pending.questionId)) {
+        history.push({ questionId: pending.questionId, choice: data.choice ?? pending.choice, answeredAt: Date.now() });
+        localStorage.setItem("pollrr:opinion-history", JSON.stringify(history));
+      }
+    }
     setMessage("");
   }, []);
 
@@ -74,7 +90,10 @@ export default function Home() {
     update();
     window.addEventListener("online", update);
     window.addEventListener("offline", update);
-    const timer = window.setTimeout(loadPoll, 0);
+    const timer = window.setTimeout(() => {
+      setPrivateMap(localStorage.getItem("pollrr:private-map") === "yes");
+      loadPoll();
+    }, 0);
     return () => {
       window.clearTimeout(timer);
       window.removeEventListener("online", update);
@@ -102,6 +121,15 @@ export default function Home() {
     }
   }, [online, sendVote]);
 
+  useEffect(() => {
+    if (stage !== "result" || !poll) return;
+    fetch(`/api/insights/${poll.id}`)
+      .then((response) => response.ok ? response.json() : null)
+      .then((data: { commonGround?: { reason: string }[] } | null) =>
+        setCommonGround(data?.commonGround?.map((item) => item.reason) ?? []))
+      .catch(() => setCommonGround([]));
+  }, [stage, poll]);
+
   const vote = async (value: Choice) => {
     if (!poll || !["vote", "queued"].includes(stage)) return;
     const pending: PendingVote = {
@@ -109,6 +137,7 @@ export default function Home() {
       choice: value,
       voterKey: deviceKey(),
       rippleId: new URLSearchParams(location.search).get("r") || crypto.randomUUID(),
+      responseMs: Date.now() - startedAt.current,
     };
     setChoice(value);
     localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
@@ -124,6 +153,27 @@ export default function Home() {
       setStage("queued");
       setMessage(error instanceof Error ? error.message : "Saved. Tap to retry.");
     }
+  };
+
+  const togglePrivateMap = (enabled: boolean) => {
+    setPrivateMap(enabled);
+    localStorage.setItem("pollrr:private-map", enabled ? "yes" : "no");
+  };
+
+  const saveExplanation = async () => {
+    if (!poll || (!reasonId && !explanation.trim())) return;
+    const response = await fetch("/api/explanations", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        questionId: poll.id,
+        voterKey: deviceKey(),
+        reasonId: reasonId || null,
+        explanation: explanation.trim() || null,
+        quoteConsent: false,
+      }),
+    });
+    if (response.ok) setExplanationSaved(true);
   };
 
   const retry = () => {
@@ -206,6 +256,7 @@ export default function Home() {
             {stage === "sending" && <div className="sending-state"><span className="spinner" />Counting your answer…</div>}
             {stage === "queued" && <button className="retry-state" onClick={retry}>{message}</button>}
             <div className="privacy-line">No sign-up <span>·</span> No name attached <span>·</span> One vote per device</div>
+            <label className="private-map-opt"><input type="checkbox" checked={privateMap} onChange={event => togglePrivateMap(event.target.checked)} /> Remember my answers privately on this device</label>
           </>
         )}
 
@@ -226,6 +277,19 @@ export default function Home() {
             </div>
             <button className="share-primary" onClick={share}><span>{copied ? "Link copied" : "Ask your circle"}</span><span className="share-icon">↗</span></button>
             <p className="share-sub">They vote before seeing the result.</p>
+            <div className="explain-box">
+              <p className="eyebrow">OPTIONAL · WHY?</p>
+              {explanationSaved ? <b>Thank you. Your explanation is counted separately from your vote.</b> : <>
+                <select value={reasonId} onChange={event => setReasonId(event.target.value)} aria-label="Main reason">
+                  <option value="">Choose the reason that mattered most</option>
+                  {reasons.map(reason => <option key={reason.id} value={reason.id}>{reason.label}</option>)}
+                </select>
+                <textarea value={explanation} onChange={event => setExplanation(event.target.value)} maxLength={280} placeholder="Add context in your own words (optional)" />
+                <button onClick={saveExplanation} disabled={!reasonId && !explanation.trim()}>Save explanation</button>
+              </>}
+            </div>
+            {commonGround.length > 0 && <div className="common-ground"><span>Common ground</span><b>People on both sides mentioned {commonGround.slice(0, 2).join(" and ")}.</b><small>Based only on optional human explanations.</small></div>}
+            <div className="trust-links"><a href={`/verify/${poll.id}`}>Verify this result</a><a href="/methodology">Read the methodology</a><a href="/me">My private opinion map</a></div>
           </>
         )}
       </section>

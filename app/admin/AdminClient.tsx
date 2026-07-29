@@ -5,7 +5,13 @@ import Link from "next/link";
 
 type Question = { id: string; prompt: string; status: string; votes: number };
 type Live = Question & { topic: string; region: string; option_a: number; option_b: number };
-type Overview = { live: Live | null; totalResponses: number; questions: Question[] };
+type Overview = {
+  live: Live | null;
+  totalResponses: number;
+  questions: Question[];
+  integrity?: { total: number; trusted: number; flagged: number };
+  ledger?: { snapshot_hash: string; human_total: number; created_at: number } | null;
+};
 
 export default function AdminClient({ displayName }: { displayName: string }) {
   const [active, setActive] = useState("Overview");
@@ -105,8 +111,14 @@ export default function AdminClient({ displayName }: { displayName: string }) {
               <article><div className="metric-top"><span>Total responses</span><i className="green">Live</i></div><b>{total.toLocaleString()}</b><small>All polls</small><div className="mini-bars">{[30,44,39,58,51,64,61,75,70,86,82,96].map((h,i)=><i key={i} style={{height:`${h}%`}} />)}</div></article>
               <article><div className="metric-top"><span>Current split</span><i>Live</i></div><b>{live?.votes ? Math.round((Number(live.option_a || 0) / Number(live.votes)) * 100) : 0}%</b><small>Option A</small><div className="donut"><span>{live?.votes ?? 0}</span></div></article>
               <article><div className="metric-top"><span>Infrastructure</span><i className="green">Healthy</i></div><b>100%</b><small>Workers · D1 · R2</small><div className="sparkline">⌁⌁⌁</div></article>
-              <article><div className="metric-top"><span>Privacy</span><i>Active</i></div><b>0<span> PII</span></b><small>No names stored with votes</small><div className="quality-row"><span/><span/><span/><span/><span/></div></article>
+              <article><div className="metric-top"><span>Signal integrity</span><i>Auditable</i></div><b>{overview?.integrity?.total ? Math.round(Number(overview.integrity.trusted) / Number(overview.integrity.total) * 100) : 100}<span>% trusted</span></b><small>{Number(overview?.integrity?.flagged ?? 0)} flagged · never silently deleted</small><div className="quality-row"><span/><span/><span/><span/><span/></div></article>
             </div>
+
+            <article className="panel ledger-panel">
+              <div className="panel-head"><div><h2>Public results ledger</h2><p>Human-only aggregate commitment</p></div><a href={live ? `/verify/${live.id}` : "/methodology"} target="_blank">Open verifier →</a></div>
+              <code>{overview?.ledger?.snapshot_hash ?? "Waiting for first signed snapshot"}</code>
+              <small>Raw rows stay private. Public proofs expose hashes, methodology, counts, and signatures only.</small>
+            </article>
 
             <article className="panel questions-panel">
               <div className="panel-head"><div><h2>Question pipeline</h2><p>Cloudflare D1 source of truth</p></div><button onClick={() => setActive("Questions")}>Manage questions →</button></div>
