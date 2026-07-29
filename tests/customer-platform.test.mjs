@@ -22,23 +22,26 @@ test("public poll supports direct and tracked distribution links", async () => {
 
 test("admin exposes the complete customer operating workflow", async () => {
   const admin = await read("app/admin/AdminClient.tsx");
-  for (const section of ["Campaigns", "Polls", "Audiences", "Distribution", "Integrity", "Reports", "Team", "Integrations"]) {
+  for (const section of ["Campaigns", "Polls", "Samples", "Fieldwork", "Intelligence", "Integrity", "Team"]) {
     assert.match(admin, new RegExp(`"${section}"`));
   }
-  assert.match(admin, /Create → recruit → distribute → verify → publish/);
+  assert.match(admin, /Design → sample → collect → verify → analyze/);
+  assert.doesNotMatch(admin, /<Integrations/);
 });
 
-test("SaaS control plane includes clients, teams, imports, integrations, reports, and audit history", async () => {
+test("SaaS control plane includes clients, teams, sample imports, reports, and audit history", async () => {
   const migration = await read("drizzle/0005_saas_distribution.sql");
   for (const table of ["platform_admins", "audience_imports", "audience_contacts", "contact_opt_ins", "integrations", "distribution_events", "saved_reports", "audit_log"]) {
     assert.match(migration, new RegExp(`CREATE TABLE \\\`?${table}\\\`?`));
   }
   const admin = await read("app/admin/AdminClient.tsx");
   assert.match(admin, /Client administration/);
-  assert.match(admin, /Import audience contacts/);
+  assert.match(admin, /Add sample records/);
   assert.match(admin, /Response trend/);
   assert.match(admin, /Team and access/);
-  assert.match(admin, /RIPPLE DISTRIBUTION STUDIO/);
+  assert.match(admin, /FIELDWORK CONTROL/);
+  assert.match(admin, /Add records/);
+  assert.match(admin, /campaign-polls/);
 });
 
 test("contact collection is explicit and structurally separated from votes", async () => {

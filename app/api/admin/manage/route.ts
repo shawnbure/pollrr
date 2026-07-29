@@ -221,7 +221,17 @@ export async function PATCH(request: Request) {
   const member = await context(body?.organizationId);
   if (!member || !canManage(member)) return Response.json({ error: "Administrator access required." }, { status: 403 });
   if (!body?.resource || !body.id) return Response.json({ error: "Invalid update." }, { status: 400 });
-  if (body.resource === "member") {
+  if (body.resource === "organization") {
+    if (!member.platform_role) return Response.json({ error: "Platform administrator access required." }, { status: 403 });
+    const name = String(body.name ?? "").trim().slice(0, 100);
+    const contactEmail = String(body.contactEmail ?? "").trim().toLowerCase();
+    const plan = String(body.plan ?? "pilot");
+    if (!name || !contactEmail.includes("@") || !["pilot","professional","enterprise"].includes(plan)) {
+      return Response.json({ error: "Valid client name, owner email, and plan are required." }, { status: 400 });
+    }
+    await env.DB.prepare("UPDATE organizations SET name=?,contact_email=?,plan=? WHERE id=?")
+      .bind(name, contactEmail, plan, body.id).run();
+  } else if (body.resource === "member") {
     await env.DB.prepare("UPDATE organization_members SET role=?,status=? WHERE organization_id=? AND email=?")
       .bind(body.role, body.status, member.organization_id, body.id).run();
   } else if (body.resource === "campaign") {
@@ -245,6 +255,23 @@ export async function DELETE(request: Request) {
   const resource = url.searchParams.get("resource");
   const id = url.searchParams.get("id");
   if (!resource || !id) return Response.json({ error: "Invalid delete." }, { status: 400 });
+  if (resource === "organization") {
+    if (!member.platform_role) return Response.json({ error: "Platform administrator access required." }, { status: 403 });
+    const usage = await env.DB.prepare(
+      `SELECT
+       (SELECT COUNT(*) FROM campaigns WHERE organization_id=?) campaigns,
+       (SELECT COUNT(*) FROM votes v JOIN questions q ON q.id=v.question_id WHERE q.organization_id=?) responses`,
+    ).bind(id, id).first<{ campaigns:number;responses:number }>();
+    if (Number(usage?.campaigns) || Number(usage?.responses)) {
+      await env.DB.prepare("UPDATE organizations SET status='archived' WHERE id=?").bind(id).run();
+      await audit(member, "archive", "organization", id);
+      return Response.json({ id, archived: true });
+    }
+    await audit(member, "delete", "organization", id);
+    await env.DB.prepare("DELETE FROM organization_members WHERE organization_id=?").bind(id).run();
+    await env.DB.prepare("DELETE FROM organizations WHERE id=?").bind(id).run();
+    return Response.json({ id, deleted: true });
+  }
   const statements: Record<string, { sql: string; key: string }> = {
     member: { sql: "DELETE FROM organization_members WHERE organization_id=? AND email=? AND role!='owner'", key: id },
     report: { sql: "DELETE FROM saved_reports WHERE organization_id=? AND id=?", key: id },
