@@ -3,9 +3,15 @@ import { getChatGPTUser } from "../../../chatgpt-auth";
 
 export const dynamic = "force-dynamic";
 
-async function membership() {
+async function membership(requestedOrganizationId?: string | null) {
   const user = await getChatGPTUser();
   if (!user) return null;
+  if (requestedOrganizationId) {
+    const platform = await env.DB.prepare("SELECT role FROM platform_admins WHERE email=?").bind(user.email).first();
+    if (platform) return env.DB.prepare(
+      "SELECT id organization_id,'platform_admin' role,name organization_name FROM organizations WHERE id=?",
+    ).bind(requestedOrganizationId).first<{ organization_id: string; role: string; organization_name: string }>();
+  }
   return env.DB.prepare(
     `SELECT om.organization_id, om.role, o.name organization_name
      FROM organization_members om JOIN organizations o ON o.id=om.organization_id
@@ -13,8 +19,8 @@ async function membership() {
   ).bind(user.email).first<{ organization_id: string; role: string; organization_name: string }>();
 }
 
-export async function GET() {
-  const member = await membership();
+export async function GET(request: Request) {
+  const member = await membership(new URL(request.url).searchParams.get("organizationId"));
   if (!member) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const [campaigns, audiences, links, questions] = await Promise.all([
     env.DB.prepare(
@@ -24,7 +30,12 @@ export async function GET() {
         (SELECT COALESCE(SUM(dl.clicks),0) FROM distribution_links dl WHERE dl.campaign_id=c.id) clicks
        FROM campaigns c WHERE c.organization_id=? ORDER BY c.created_at DESC`,
     ).bind(member.organization_id).all(),
-    env.DB.prepare("SELECT * FROM audiences WHERE organization_id=? ORDER BY created_at DESC")
+    env.DB.prepare(
+      `SELECT a.*,
+        (SELECT COUNT(*) FROM audience_contacts ac WHERE ac.audience_id=a.id) contacts,
+        (SELECT COUNT(*) FROM audience_contacts ac WHERE ac.audience_id=a.id AND ac.consent_status='consented') consented
+       FROM audiences a WHERE a.organization_id=? ORDER BY a.created_at DESC`,
+    )
       .bind(member.organization_id).all(),
     env.DB.prepare(
       `SELECT dl.*, q.prompt, a.name audience_name
@@ -47,9 +58,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const member = await membership();
-  if (!member) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const body = await request.json().catch(() => null) as Record<string, string> | null;
+  const member = await membership(body?.organizationId);
+  if (!member) return Response.json({ error: "Unauthorized" }, { status: 401 });
   if (!body?.kind) return Response.json({ error: "Invalid request." }, { status: 400 });
   const id = crypto.randomUUID();
   const now = Date.now();
@@ -64,9 +75,12 @@ export async function POST(request: Request) {
   if (body.kind === "audience") {
     if (!body.name?.trim()) return Response.json({ error: "Audience name is required." }, { status: 400 });
     await env.DB.prepare(
-      `INSERT INTO audiences (id,organization_id,name,description,geography,created_at)
-       VALUES (?,?,?,?,?,?)`,
-    ).bind(id, member.organization_id, body.name.trim().slice(0, 100), body.description?.trim().slice(0, 300) || null, body.geography?.trim().slice(0, 100) || null, now).run();
+      `INSERT INTO audiences
+       (id,organization_id,name,description,geography,type,status,target_size,consent_basis,created_at)
+       VALUES (?,?,?,?,?,?,'draft',?,?,?)`,
+    ).bind(id, member.organization_id, body.name.trim().slice(0, 100),
+      body.description?.trim().slice(0, 300) || null, body.geography?.trim().slice(0, 100) || null,
+      body.type || "organic", Number(body.targetSize) || null, body.consentBasis?.trim().slice(0, 200) || null, now).run();
     return Response.json({ id, kind: body.kind }, { status: 201 });
   }
   if (body.kind === "link") {
@@ -83,4 +97,60 @@ export async function POST(request: Request) {
     return Response.json({ id, kind: body.kind, token, url: `/?p=${question.id}&src=${token}` }, { status: 201 });
   }
   return Response.json({ error: "Unsupported request." }, { status: 400 });
+}
+
+export async function PATCH(request: Request) {
+  const body = await request.json().catch(() => null) as Record<string, string> | null;
+  const member = await membership(body?.organizationId);
+  if (!member || !["owner", "admin", "editor"].includes(member.role)) {
+    if (member?.role !== "platform_admin")
+    return Response.json({ error: "Editor access required." }, { status: 403 });
+  }
+  if (!body?.kind || !body.id) return Response.json({ error: "Invalid update." }, { status: 400 });
+  if (body.kind === "campaign") {
+    await env.DB.prepare("UPDATE campaigns SET name=?,objective=?,status=? WHERE id=? AND organization_id=?")
+      .bind(body.name?.trim().slice(0, 100), body.objective?.trim().slice(0, 300) || null,
+        body.status || "draft", body.id, member.organization_id).run();
+  } else if (body.kind === "audience") {
+    await env.DB.prepare(
+      `UPDATE audiences SET name=?,description=?,geography=?,type=?,status=?,target_size=?,consent_basis=?
+       WHERE id=? AND organization_id=?`,
+    ).bind(body.name?.trim().slice(0, 100), body.description?.trim().slice(0, 300) || null,
+      body.geography?.trim().slice(0, 100) || null, body.type || "organic", body.status || "draft",
+      Number(body.targetSize) || null, body.consentBasis?.trim().slice(0, 200) || null,
+      body.id, member.organization_id).run();
+  } else if (body.kind === "link") {
+    await env.DB.prepare("UPDATE distribution_links SET label=?,channel=?,status=? WHERE id=? AND organization_id=?")
+      .bind(body.label?.trim().slice(0, 100), body.channel || "link", body.status || "active", body.id, member.organization_id).run();
+  } else return Response.json({ error: "Unsupported resource." }, { status: 400 });
+  return Response.json({ id: body.id });
+}
+
+export async function DELETE(request: Request) {
+  const url = new URL(request.url);
+  const member = await membership(url.searchParams.get("organizationId"));
+  if (!member || !["owner", "admin"].includes(member.role)) {
+    if (member?.role !== "platform_admin")
+    return Response.json({ error: "Administrator access required." }, { status: 403 });
+  }
+  const kind = url.searchParams.get("kind");
+  const id = url.searchParams.get("id");
+  if (!kind || !id) return Response.json({ error: "Invalid delete." }, { status: 400 });
+  if (kind === "link") {
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM distribution_events WHERE distribution_link_id=?").bind(id),
+      env.DB.prepare("DELETE FROM distribution_links WHERE id=? AND organization_id=?").bind(id, member.organization_id),
+    ]);
+    return Response.json({ deleted: true });
+  }
+  const table = kind === "campaign" ? "campaigns" : kind === "audience" ? "audiences" : null;
+  if (!table) return Response.json({ error: "Unsupported resource." }, { status: 400 });
+  const dependencies = kind === "campaign"
+    ? await env.DB.prepare("SELECT COUNT(*) count FROM questions WHERE campaign_id=?").bind(id).first<{ count: number }>()
+    : await env.DB.prepare("SELECT COUNT(*) count FROM audience_contacts WHERE audience_id=?").bind(id).first<{ count: number }>();
+  if (Number(dependencies?.count ?? 0) > 0) {
+    return Response.json({ error: "Archive this record because it has history." }, { status: 409 });
+  }
+  await env.DB.prepare(`DELETE FROM ${table} WHERE id=? AND organization_id=?`).bind(id, member.organization_id).run();
+  return Response.json({ deleted: true });
 }

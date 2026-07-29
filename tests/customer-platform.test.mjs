@@ -22,8 +22,30 @@ test("public poll supports direct and tracked distribution links", async () => {
 
 test("admin exposes the complete customer operating workflow", async () => {
   const admin = await read("app/admin/AdminClient.tsx");
-  for (const section of ["Campaigns", "Polls", "Audiences", "Distribution", "Results", "Integrity", "Reports", "Team"]) {
+  for (const section of ["Campaigns", "Polls", "Audiences", "Distribution", "Integrity", "Reports", "Team", "Integrations"]) {
     assert.match(admin, new RegExp(`"${section}"`));
   }
-  assert.match(admin, /Campaign → poll → audience → tracked link/);
+  assert.match(admin, /Create → recruit → distribute → verify → publish/);
+});
+
+test("SaaS control plane includes clients, teams, imports, integrations, reports, and audit history", async () => {
+  const migration = await read("drizzle/0005_saas_distribution.sql");
+  for (const table of ["platform_admins", "audience_imports", "audience_contacts", "contact_opt_ins", "integrations", "distribution_events", "saved_reports", "audit_log"]) {
+    assert.match(migration, new RegExp(`CREATE TABLE \\\`?${table}\\\`?`));
+  }
+  const admin = await read("app/admin/AdminClient.tsx");
+  assert.match(admin, /Client administration/);
+  assert.match(admin, /Import audience contacts/);
+  assert.match(admin, /Response trend/);
+  assert.match(admin, /Team and access/);
+  assert.match(admin, /RIPPLE DISTRIBUTION STUDIO/);
+});
+
+test("contact collection is explicit and structurally separated from votes", async () => {
+  const contact = await read("app/api/contact/route.ts");
+  assert.match(contact, /Explicit consent/);
+  assert.doesNotMatch(contact, /vote_id|question_id|voter_key/);
+  const privacy = await read("app/privacy/page.tsx");
+  assert.match(privacy, /separate contact vault/);
+  assert.match(privacy, /stores no vote identifier, answer, question identifier, or device identifier/);
 });
