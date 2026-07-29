@@ -12,6 +12,9 @@
   "env": {
     "production": {
       "name": "pollrr-production",
+      "vars": {
+        "LEDGER_PUBLIC_KEY": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAER9QNpnluBp4Dq6bcxrlOTOBfH0LylGCwMuNVFhpqdDhZDgqQHz+HxOej5xYCTq1Q30b4t4tnHsH+nMBAvSbS0A=="
+      },
       "routes": [
         { "pattern": "app.pollrr.com", "custom_domain": true }
       ],
@@ -25,6 +28,9 @@
     },
     "development": {
       "name": "pollrr-development",
+      "vars": {
+        "LEDGER_PUBLIC_KEY": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAER9QNpnluBp4Dq6bcxrlOTOBfH0LylGCwMuNVFhpqdDhZDgqQHz+HxOej5xYCTq1Q30b4t4tnHsH+nMBAvSbS0A=="
+      },
       "routes": [
         { "pattern": "dev.pollrr.com", "custom_domain": true }
       ],

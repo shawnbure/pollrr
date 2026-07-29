@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { publishSnapshot, sha256 } from "../../lib/ledger";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,9 @@ export async function GET() {
     return Response.json({ error: "No poll is live right now." }, { status: 404 });
   }
 
+  const reasons = await env.DB.prepare(
+    "SELECT id, label FROM question_reasons WHERE question_id = ? ORDER BY sort_order",
+  ).bind(poll.id).all<{ id: string; label: string }>();
   return Response.json({
     poll: {
       id: poll.id,
@@ -55,7 +59,8 @@ export async function GET() {
       region: poll.region,
       status: poll.status,
     },
-    totals: await totals(poll.id),
+    reasons: reasons.results,
+    resultPolicy: "Results unlock only after a human answer is counted.",
   });
 }
 
@@ -66,6 +71,10 @@ export async function POST(request: Request) {
     voterKey?: string;
     rippleId?: string;
     parentRippleId?: string | null;
+    responseMs?: number;
+    reasonId?: string | null;
+    explanation?: string | null;
+    quoteConsent?: boolean;
   } | null;
 
   if (
@@ -120,6 +129,16 @@ export async function POST(request: Request) {
 
   const id = crypto.randomUUID();
   const rippleId = body.rippleId?.slice(0, 80) || crypto.randomUUID();
+  const createdAt = Date.now();
+  const responseMs = Number.isFinite(body.responseMs) ? Math.max(0, Math.min(Number(body.responseMs), 600_000)) : null;
+  const integrityStatus = responseMs !== null && responseMs < 900 ? "flagged" : "trusted";
+  const integrityReason = integrityStatus === "flagged" ? "response_under_900ms" : "passed_v1_checks";
+  const sourceClass = body.parentRippleId || body.rippleId ? "referred" : "direct";
+  const eventId = crypto.randomUUID();
+  const payloadHash = await sha256(JSON.stringify({
+    eventId, voteId: id, questionId: body.questionId, choice: body.choice,
+    responseMs, sourceClass, createdAt,
+  }));
   const inserted = await env.DB.prepare(
     `INSERT OR IGNORE INTO votes
       (id, question_id, choice, ripple_id, parent_ripple_id, region_code, consent_version, voter_key, created_at)
@@ -131,7 +150,7 @@ export async function POST(request: Request) {
     rippleId,
     body.parentRippleId?.slice(0, 80) || null,
     body.voterKey,
-    Date.now(),
+    createdAt,
   ).run();
 
   if (!inserted.meta.changes) {
@@ -146,10 +165,41 @@ export async function POST(request: Request) {
     });
   }
 
+  await env.DB.prepare(
+    `INSERT INTO vote_events
+      (id, vote_id, question_id, payload_hash, integrity_status, integrity_reason,
+       response_ms, source_class, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    eventId, id, body.questionId, payloadHash, integrityStatus, integrityReason,
+    responseMs, sourceClass, createdAt,
+  ).run();
+
+  if (body.reasonId || body.explanation?.trim()) {
+    const reason = body.reasonId
+      ? await env.DB.prepare(
+        "SELECT id FROM question_reasons WHERE id = ? AND question_id = ?",
+      ).bind(body.reasonId, body.questionId).first<{ id: string }>()
+      : null;
+    await env.DB.prepare(
+      `INSERT INTO explanations
+        (id, vote_id, question_id, choice, reason_id, explanation, quote_consent, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(), id, body.questionId, body.choice,
+      reason?.id ?? null, body.explanation?.trim().slice(0, 280) || null,
+      body.quoteConsent ? 1 : 0, createdAt,
+    ).run();
+  }
+
+  await publishSnapshot(env, body.questionId);
+
   return Response.json({
     accepted: true,
     duplicate: false,
+    voteId: id,
     choice: body.choice,
+    integrity: { status: integrityStatus, reason: integrityReason },
     totals: await totals(body.questionId),
   }, { status: 201 });
 }

@@ -31,11 +31,23 @@ export async function GET() {
 
   const total = await env.DB.prepare("SELECT COUNT(*) AS count FROM votes")
     .first<{ count: number }>();
+  const integrity = await env.DB.prepare(
+    `SELECT COUNT(*) total,
+      SUM(CASE WHEN integrity_status='trusted' THEN 1 ELSE 0 END) trusted,
+      SUM(CASE WHEN integrity_status='flagged' THEN 1 ELSE 0 END) flagged
+     FROM vote_events`,
+  ).first();
+  const ledger = await env.DB.prepare(
+    `SELECT snapshot_hash, human_total, created_at FROM aggregate_snapshots
+     ORDER BY created_at DESC LIMIT 1`,
+  ).first();
 
   return Response.json({
     user,
     live,
     totalResponses: Number(total?.count ?? 0),
+    integrity,
+    ledger,
     questions: pipeline.results,
   });
 }
