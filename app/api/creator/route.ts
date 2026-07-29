@@ -102,6 +102,26 @@ export async function PATCH(request:Request) {
     ).bind(context.email,body.nightlyResults?1:0,now,now).run();
     return Response.json({ saved:true });
   }
+  if (body?.kind==="poll") {
+    const id=String(body.id||"");
+    const prompt=String(body.prompt||"").trim();
+    const optionA=String(body.optionA||"").trim();
+    const optionB=String(body.optionB||"").trim();
+    if(!id||prompt.length<6||prompt.length>180||!optionA||!optionB) {
+      return Response.json({error:"Add a question and two answer choices."},{status:400});
+    }
+    const row=await env.DB.prepare(
+      `SELECT q.id,(SELECT COUNT(*) FROM votes v WHERE v.question_id=q.id) votes
+       FROM questions q WHERE q.id=? AND q.organization_id=? AND (q.created_by=? OR q.created_by IS NULL)`,
+    ).bind(id,context.organizationId,context.email).first<{id:string;votes:number}>();
+    if(!row)return Response.json({error:"Poll not found."},{status:404});
+    if(Number(row.votes)>0)return Response.json({error:"Question wording and choices lock after the first response. Duplicate the poll to ask a revised version."},{status:409});
+    await env.DB.prepare(
+      "UPDATE questions SET prompt=?,option_a=?,option_b=?,topic=?,tags=? WHERE id=?",
+    ).bind(prompt,optionA.slice(0,60),optionB.slice(0,60),String(body.topic||"General").slice(0,50),
+      String(body.tags||"").split(",").map(tag=>tag.trim().toLowerCase()).filter(Boolean).slice(0,8).join(","),id).run();
+    return Response.json({id,updated:true});
+  }
   const id=String(body?.id||"");
   const status=String(body?.status||"");
   if (!id || !["live","paused","closed"].includes(status)) return Response.json({ error:"Invalid update." },{ status:400 });
@@ -109,4 +129,24 @@ export async function PATCH(request:Request) {
     "UPDATE questions SET status=? WHERE id=? AND organization_id=? AND (created_by=? OR created_by IS NULL)",
   ).bind(status,id,context.organizationId,context.email).run();
   return Response.json({ id,status });
+}
+
+export async function DELETE(request:Request) {
+  const context=await creatorContext();
+  if(!context)return Response.json({error:"Unauthorized"},{status:401});
+  const id=new URL(request.url).searchParams.get("id")||"";
+  const row=await env.DB.prepare(
+    `SELECT q.id,(SELECT COUNT(*) FROM votes v WHERE v.question_id=q.id) votes
+     FROM questions q WHERE q.id=? AND q.organization_id=? AND (q.created_by=? OR q.created_by IS NULL)`,
+  ).bind(id,context.organizationId,context.email).first<{id:string;votes:number}>();
+  if(!row)return Response.json({error:"Poll not found."},{status:404});
+  if(Number(row.votes)>0){
+    await env.DB.prepare("UPDATE questions SET status='closed',is_public=0 WHERE id=?").bind(id).run();
+    return Response.json({id,archived:true});
+  }
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM question_reasons WHERE question_id=?").bind(id),
+    env.DB.prepare("DELETE FROM questions WHERE id=?").bind(id),
+  ]);
+  return Response.json({id,deleted:true});
 }

@@ -1001,3 +1001,166 @@ button, input, select, textarea { min-height: 44px; }
   .crud-row .row-actions { grid-column: 1/-1; }
   .simple-row { grid-template-columns: 1fr; gap: 8px; }
 }
+
+/* Pollrr electric studio — clean, current, and unmistakably product-led */
+.creator-shell {
+  background:
+    radial-gradient(circle at 8% 4%, rgba(132,94,247,.10), transparent 28rem),
+    radial-gradient(circle at 94% 18%, rgba(39,211,196,.10), transparent 25rem),
+    #f6f7fb;
+}
+.creator-top {
+  height: 76px;
+  background: rgba(255,255,255,.86);
+  border-bottom-color: #e5e7f0;
+}
+.creator-logo span { background: #7457f5; color: white; box-shadow: 5px 5px 0 #a7f3e6; }
+.creator-top nav {
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid #e5e7f0;
+  border-radius: 14px;
+  background: #f1f2f8;
+}
+.creator-top nav button,.creator-top nav a {
+  min-height: 38px;
+  padding: 7px 14px;
+  border-radius: 10px;
+  color: #66697a;
+  font-size: 13px;
+}
+.creator-top nav button.active,.creator-top nav a:hover {
+  background: #fff;
+  color: #242334;
+  box-shadow: 0 3px 10px rgba(43,38,80,.08);
+}
+.creator-avatar,.recent-poll button,.creator-primary { background: #28263a; }
+.welcome-block { background: linear-gradient(135deg,#27253a 0%,#423877 100%); }
+.welcome-block::after { background: #7457f5; box-shadow: -130px 220px 0 #2bd3c4; }
+.welcome-block p,.creator-title p,.create-copy p { color: #7457f5; }
+.welcome-block button,.creator-title > button,.ai-upgrade button,.creator-empty button { background: #a7f3e6; }
+.creator-stats article,.poll-library > article,.result-report,.account-grid article,.creator-empty {
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(43,38,80,.06);
+}
+.recent-poll { background: #ece9ff; }
+.recent-poll small { color: #6547df; }
+.create-card.theme-paper { background: #fff; }
+.theme-dot.paper { background: #fff; }
+.poll-actions { flex-wrap: wrap; justify-content: flex-end; }
+.poll-actions button,.share-platforms button {
+  min-height: 38px;
+  padding: 7px 11px;
+  border: 1px solid #dfe1ea;
+  border-radius: 10px;
+  background: #fff;
+  color: #343246;
+}
+.poll-actions button:first-child,.poll-actions .action-primary { border-color:#28263a; background:#28263a; color:#fff; }
+.poll-actions .action-danger { border-color:#ffd9df; background:#fff5f6; color:#c8324b; }
+.creator-editor textarea,.creator-editor input {
+  width:100%;
+  margin-bottom:12px;
+  border:2px solid #dfe1ea;
+  border-radius:14px;
+  background:#fff;
+  padding:14px 16px;
+  color:#28263a;
+  font:inherit;
+  font-size:16px;
+}
+.creator-editor textarea { min-height:130px; resize:vertical; font-size:20px; font-weight:700; }
+
+.modern-admin {
+  --studio-bg:#f4f6fb;
+  --studio-card:#ffffff;
+  --studio-ink:#242334;
+  --studio-muted:#6d7082;
+  --studio-coral:#7457f5;
+  background:
+    radial-gradient(circle at 86% 3%,rgba(116,87,245,.10),transparent 26rem),
+    radial-gradient(circle at 55% 100%,rgba(43,211,196,.07),transparent 28rem),
+    var(--studio-bg);
+}
+.modern-admin .panel { border-color:#e3e5ee; background:#fff; box-shadow:0 12px 34px rgba(43,38,80,.055); }
+.modern-admin .workspace-list > .client-row,.global-polls > article { border-bottom-color:#e8eaf1; }
+.modern-admin .panel-head button,.modern-admin .new-btn {
+  min-height:42px;
+  border:1px solid #7457f5;
+  border-radius:11px;
+  background:#7457f5;
+  color:#fff;
+  padding:9px 14px;
+}
+.modern-admin .row-actions { gap:6px; }
+.modern-admin .row-actions button {
+  min-width:0!important;
+  min-height:38px;
+  padding:7px 11px;
+  border:1px solid #dfe1ea;
+  border-radius:10px;
+  background:#fff;
+  color:#343246;
+  font-size:13px;
+  box-shadow:none;
+}
+.modern-admin .row-actions button:hover { border-color:#9b89f8; background:#f7f5ff; }
+.modern-admin .row-actions .action-primary {
+  border-color:#28263a;
+  background:#28263a;
+  color:#fff;
+}
+.modern-admin .row-actions .action-danger {
+  border-color:#ffd9df;
+  background:#fff5f6;
+  color:#c8324b;
+}
+.modern-admin .client-row { grid-template-columns:72px minmax(280px,1.5fr) repeat(2,minmax(100px,.45fr)) minmax(210px,auto); }
+.global-polls > article { grid-template-columns:72px minmax(320px,1fr) 90px minmax(420px,auto); }
+.poll-filters input,.poll-filters select { border-color:#dfe1ea; background:#fff; }
+.status.live,.status.active { background:#dffaf4; color:#08796d; }
+.status.paused,.status.draft { background:#ece9ff; color:#6045cf; }
+.status.closed,.status.archived { background:#f0f1f5; color:#686b78; }
+
+/* Dense libraries with deliberate overflow behavior */
+.creator-content { padding-top:34px; }
+.creator-title { margin-bottom:22px; }
+.creator-title h1 { font-size:clamp(44px,5vw,64px); }
+.poll-library,.global-polls,.modern-admin .crud-list {
+  scrollbar-width:thin;
+  scrollbar-color:#aaa0e8 #eef0f6;
+}
+.poll-library {
+  max-height:calc(100vh - 225px);
+  overflow-y:auto;
+  padding-right:7px;
+}
+.poll-library > article {
+  min-height:105px;
+  padding:17px 18px;
+  border:1px solid #e6e8ef;
+  border-radius:17px;
+  box-shadow:none;
+}
+.poll-library h2 { margin:5px 0; font-size:19px; }
+.modern-admin .panel.workspace-panel { padding:26px 28px; }
+.modern-admin .workspace-list { margin-top:18px; }
+.global-polls {
+  max-height:calc(100vh - 330px);
+  overflow-y:auto;
+  margin-top:12px;
+  padding-right:7px;
+}
+.global-polls > article { padding:15px 6px; }
+.global-polls h2 { margin:4px 0; font-size:17px; }
+.poll-filters { margin-top:20px; }
+.poll-filters input,.poll-filters select { min-height:44px; }
+.filter-count { margin-top:9px; }
+.modern-admin .crud-list {
+  max-height:calc(100vh - 260px);
+  overflow-y:auto;
+  padding-right:7px;
+}
+.poll-library::-webkit-scrollbar,.global-polls::-webkit-scrollbar,.modern-admin .crud-list::-webkit-scrollbar { width:9px; }
+.poll-library::-webkit-scrollbar-track,.global-polls::-webkit-scrollbar-track,.modern-admin .crud-list::-webkit-scrollbar-track { background:#eef0f6; border-radius:20px; }
+.poll-library::-webkit-scrollbar-thumb,.global-polls::-webkit-scrollbar-thumb,.modern-admin .crud-list::-webkit-scrollbar-thumb { background:#aaa0e8; border:2px solid #eef0f6; border-radius:20px; }

@@ -75,9 +75,12 @@ export async function PATCH(request: Request) {
     return Response.json({ error: "Invalid update." }, { status: 400 });
   }
   const owned = await env.DB.prepare(
-    `SELECT q.id FROM questions q JOIN organization_members om ON om.organization_id=q.organization_id
-     WHERE q.id=? AND om.email=? AND om.role IN ('owner','admin','editor')`,
-  ).bind(body.id, user.email).first();
+    `SELECT q.id FROM questions q
+     WHERE q.id=? AND (
+       EXISTS (SELECT 1 FROM organization_members om WHERE om.organization_id=q.organization_id AND om.email=? AND om.role IN ('owner','admin','editor'))
+       OR EXISTS (SELECT 1 FROM platform_admins pa WHERE pa.email=?)
+     )`,
+  ).bind(body.id, user.email, user.email).first();
   if (!owned) return Response.json({ error: "Forbidden" }, { status: 403 });
 
   if (body.prompt) {
@@ -109,9 +112,12 @@ export async function DELETE(request: Request) {
   if (!id) return Response.json({ error: "Question id required." }, { status: 400 });
   const row = await env.DB.prepare(
     `SELECT q.id,(SELECT COUNT(*) FROM votes v WHERE v.question_id=q.id) votes
-     FROM questions q JOIN organization_members om ON om.organization_id=q.organization_id
-     WHERE q.id=? AND om.email=? AND om.role IN ('owner','admin')`,
-  ).bind(id, user.email).first<{ id: string; votes: number }>();
+     FROM questions q
+     WHERE q.id=? AND (
+       EXISTS (SELECT 1 FROM organization_members om WHERE om.organization_id=q.organization_id AND om.email=? AND om.role IN ('owner','admin'))
+       OR EXISTS (SELECT 1 FROM platform_admins pa WHERE pa.email=?)
+     )`,
+  ).bind(id, user.email, user.email).first<{ id: string; votes: number }>();
   if (!row) return Response.json({ error: "Forbidden" }, { status: 403 });
   if (Number(row.votes) > 0) return Response.json({ error: "Close this poll; immutable vote history cannot be deleted." }, { status: 409 });
   await env.DB.batch([

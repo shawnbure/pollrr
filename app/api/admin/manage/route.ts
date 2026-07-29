@@ -50,7 +50,7 @@ export async function GET(request: Request) {
         (SELECT COUNT(*) FROM votes v JOIN questions q ON q.id=v.question_id WHERE q.organization_id=o.id) responses
        FROM organizations o ORDER BY o.created_at DESC`,
     ).all(),env.DB.prepare(
-      `SELECT q.id,q.prompt,q.status,q.topic,q.tags,q.created_by,q.created_at,o.name organization_name,
+      `SELECT q.id,q.prompt,q.option_a optionA,q.option_b optionB,q.status,q.topic,q.tags,q.region,q.created_by,q.created_at,o.name organization_name,
         COUNT(v.id) responses
        FROM questions q JOIN organizations o ON o.id=q.organization_id
        LEFT JOIN votes v ON v.question_id=q.id
@@ -95,7 +95,7 @@ export async function GET(request: Request) {
        FROM organizations o ORDER BY o.created_at DESC`,
     ).all() : Promise.resolve({ results: [] }),
     member.platform_role ? env.DB.prepare(
-      `SELECT q.id,q.prompt,q.status,q.topic,q.tags,q.created_by,q.created_at,o.name organization_name,
+      `SELECT q.id,q.prompt,q.option_a optionA,q.option_b optionB,q.status,q.topic,q.tags,q.region,q.created_by,q.created_at,o.name organization_name,
         COUNT(v.id) responses
        FROM questions q JOIN organizations o ON o.id=q.organization_id
        LEFT JOIN votes v ON v.question_id=q.id
@@ -240,11 +240,12 @@ export async function PATCH(request: Request) {
     const name = String(body.name ?? "").trim().slice(0, 100);
     const contactEmail = String(body.contactEmail ?? "").trim().toLowerCase();
     const plan = String(body.plan ?? "pilot");
-    if (!name || !contactEmail.includes("@") || !["pilot","professional","enterprise"].includes(plan)) {
+    if (!name || !contactEmail.includes("@") || !["free","pilot","professional","enterprise"].includes(plan)) {
       return Response.json({ error: "Valid client name, owner email, and plan are required." }, { status: 400 });
     }
-    await env.DB.prepare("UPDATE organizations SET name=?,contact_email=?,plan=? WHERE id=?")
-      .bind(name, contactEmail, plan, body.id).run();
+    const status=["active","archived"].includes(String(body.status))?String(body.status):"active";
+    await env.DB.prepare("UPDATE organizations SET name=?,contact_email=?,plan=?,status=? WHERE id=?")
+      .bind(name, contactEmail, plan, status, body.id).run();
   } else if (body.resource === "member") {
     await env.DB.prepare("UPDATE organization_members SET role=?,status=? WHERE organization_id=? AND email=?")
       .bind(body.role, body.status, member.organization_id, body.id).run();
