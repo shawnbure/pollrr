@@ -15,7 +15,7 @@ type Poll = {
 };
 type Totals = { total: number; optionA: number; optionB: number };
 type Reason = { id: string; label: string };
-type PendingVote = { questionId: string; choice: Choice; voterKey: string; rippleId: string; responseMs?: number };
+type PendingVote = { questionId: string; choice: Choice; voterKey: string; rippleId: string; responseMs?: number; sourceToken?: string | null };
 
 const PENDING_KEY = "pollrr:pending-vote";
 const VOTER_KEY = "pollrr:voter-key";
@@ -47,7 +47,7 @@ export default function Home() {
 
   const loadPoll = useCallback(async () => {
     try {
-      const response = await fetch("/api/poll", { cache: "no-store" });
+      const response = await fetch(`/api/poll${location.search}`, { cache: "no-store" });
       if (!response.ok) throw new Error("No live poll");
       const data = await response.json() as { poll: Poll; reasons: Reason[] };
       setPoll(data.poll);
@@ -138,6 +138,7 @@ export default function Home() {
       voterKey: deviceKey(),
       rippleId: new URLSearchParams(location.search).get("r") || crypto.randomUUID(),
       responseMs: Date.now() - startedAt.current,
+      sourceToken: new URLSearchParams(location.search).get("src"),
     };
     setChoice(value);
     localStorage.setItem(PENDING_KEY, JSON.stringify(pending));

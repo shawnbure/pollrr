@@ -10,6 +10,8 @@ export const questions = sqliteTable("questions", {
   status: text("status", { enum: ["draft", "scheduled", "live", "paused", "closed"] }).notNull(),
   scheduledAt: integer("scheduled_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  organizationId: text("organization_id"),
+  campaignId: text("campaign_id"),
 });
 
 export const votes = sqliteTable("votes", {
@@ -93,3 +95,50 @@ export const aggregateSnapshots = sqliteTable("aggregate_snapshots", {
   publicKey: text("public_key").notNull(),
   createdAt: integer("created_at").notNull(),
 }, (table) => [index("aggregate_snapshots_question_idx").on(table.questionId, table.createdAt)]);
+
+export const organizations = sqliteTable("organizations", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const organizationMembers = sqliteTable("organization_members", {
+  organizationId: text("organization_id").notNull().references(() => organizations.id),
+  email: text("email").notNull(),
+  role: text("role").notNull(),
+  createdAt: integer("created_at").notNull(),
+}, (table) => [uniqueIndex("organization_members_pk").on(table.organizationId, table.email)]);
+
+export const campaigns = sqliteTable("campaigns", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  objective: text("objective"),
+  status: text("status").notNull(),
+  startsAt: integer("starts_at"),
+  endsAt: integer("ends_at"),
+  createdAt: integer("created_at").notNull(),
+}, (table) => [index("campaigns_org_idx").on(table.organizationId, table.createdAt)]);
+
+export const audiences = sqliteTable("audiences", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  geography: text("geography"),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const distributionLinks = sqliteTable("distribution_links", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id),
+  campaignId: text("campaign_id").notNull().references(() => campaigns.id),
+  questionId: text("question_id").notNull().references(() => questions.id),
+  audienceId: text("audience_id").references(() => audiences.id),
+  channel: text("channel").notNull(),
+  label: text("label").notNull(),
+  token: text("token").notNull().unique(),
+  clicks: integer("clicks").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+}, (table) => [index("distribution_campaign_idx").on(table.campaignId, table.createdAt)]);

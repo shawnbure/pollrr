@@ -4,11 +4,12 @@ import { getChatGPTUser } from "../../../chatgpt-auth";
 export const dynamic = "force-dynamic";
 
 async function authorize() {
-  return Boolean(await getChatGPTUser());
+  return getChatGPTUser();
 }
 
 export async function POST(request: Request) {
-  if (!(await authorize())) {
+  const user = await authorize();
+  if (!user) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
     optionB?: string;
     topic?: string;
     region?: string;
+    campaignId?: string;
   } | null;
 
   const prompt = body?.prompt?.trim() ?? "";
@@ -26,10 +28,18 @@ export async function POST(request: Request) {
   }
 
   const id = crypto.randomUUID();
+  const campaign = body?.campaignId
+    ? await env.DB.prepare(
+      `SELECT c.id,c.organization_id FROM campaigns c
+       JOIN organization_members om ON om.organization_id=c.organization_id
+       WHERE c.id=? AND om.email=?`,
+    ).bind(body.campaignId, user.email).first<{ id: string; organization_id: string }>()
+    : null;
+  if (!campaign) return Response.json({ error: "Choose a campaign." }, { status: 400 });
   await env.DB.prepare(
     `INSERT INTO questions
-      (id, prompt, option_a, option_b, topic, region, status, scheduled_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, 'draft', NULL, ?)`,
+      (id, prompt, option_a, option_b, topic, region, status, scheduled_at, created_at, organization_id, campaign_id)
+     VALUES (?, ?, ?, ?, ?, ?, 'draft', NULL, ?, ?, ?)`,
   ).bind(
     id,
     prompt,
@@ -38,6 +48,8 @@ export async function POST(request: Request) {
     body?.topic?.trim().slice(0, 50) || "General",
     body?.region?.trim().slice(0, 50) || "United States",
     Date.now(),
+    campaign.organization_id,
+    campaign.id,
   ).run();
 
   return Response.json({ id, status: "draft" }, { status: 201 });

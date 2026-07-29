@@ -13,7 +13,11 @@ type PollRow = {
   status: string;
 };
 
-async function livePoll(): Promise<PollRow | null> {
+async function livePoll(questionId?: string | null): Promise<PollRow | null> {
+  if (questionId) return env.DB.prepare(
+    `SELECT id, prompt, option_a, option_b, topic, region, status FROM questions
+     WHERE id=? AND status='live' LIMIT 1`,
+  ).bind(questionId).first<PollRow>();
   return env.DB.prepare(
     `SELECT id, prompt, option_a, option_b, topic, region, status
      FROM questions
@@ -40,10 +44,17 @@ async function totals(questionId: string) {
   };
 }
 
-export async function GET() {
-  const poll = await livePoll();
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const poll = await livePoll(url.searchParams.get("p"));
   if (!poll) {
     return Response.json({ error: "No poll is live right now." }, { status: 404 });
+  }
+  const sourceToken = url.searchParams.get("src");
+  if (sourceToken) {
+    await env.DB.prepare(
+      "UPDATE distribution_links SET clicks=clicks+1 WHERE token=? AND question_id=?",
+    ).bind(sourceToken, poll.id).run();
   }
 
   const reasons = await env.DB.prepare(
@@ -75,6 +86,7 @@ export async function POST(request: Request) {
     reasonId?: string | null;
     explanation?: string | null;
     quoteConsent?: boolean;
+    sourceToken?: string | null;
   } | null;
 
   if (
@@ -133,7 +145,12 @@ export async function POST(request: Request) {
   const responseMs = Number.isFinite(body.responseMs) ? Math.max(0, Math.min(Number(body.responseMs), 600_000)) : null;
   const integrityStatus = responseMs !== null && responseMs < 900 ? "flagged" : "trusted";
   const integrityReason = integrityStatus === "flagged" ? "response_under_900ms" : "passed_v1_checks";
-  const sourceClass = body.parentRippleId || body.rippleId ? "referred" : "direct";
+  const distribution = body.sourceToken
+    ? await env.DB.prepare(
+      "SELECT channel FROM distribution_links WHERE token=? AND question_id=?",
+    ).bind(body.sourceToken, body.questionId).first<{ channel: string }>()
+    : null;
+  const sourceClass = distribution ? `channel:${distribution.channel}` : body.parentRippleId || body.rippleId ? "referred" : "direct";
   const eventId = crypto.randomUUID();
   const payloadHash = await sha256(JSON.stringify({
     eventId, voteId: id, questionId: body.questionId, choice: body.choice,

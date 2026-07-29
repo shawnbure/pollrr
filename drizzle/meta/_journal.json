@@ -29,6 +29,13 @@
       "when": 1785285600000,
       "tag": "0003_trust_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1785286800000,
+      "tag": "0004_customer_platform",
+      "breakpoints": true
     }
   ]
 }
