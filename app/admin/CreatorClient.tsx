@@ -14,6 +14,7 @@ export default function CreatorClient({displayName}:{displayName:string}) {
   const [form,setForm]=useState({prompt:"",optionA:"Yes",optionB:"No",topic:"",tags:"",theme:"paper",isPublic:true});
   const [busy,setBusy]=useState(false);
   const [notice,setNotice]=useState("");
+  const [editing,setEditing]=useState<Poll|null>(null);
   const load=useCallback(async()=>{const r=await fetch("/api/creator",{cache:"no-store"});if(r.ok){const next=await r.json() as CreatorData;setData(next);setSelected(current=>current||next.polls[0]?.id||"")}},[]);
   useEffect(()=>{const timer=window.setTimeout(()=>void load(),0);return()=>window.clearTimeout(timer)},[load]);
   const active=data.polls.find(p=>p.id===selected)||data.polls[0];
@@ -33,6 +34,21 @@ export default function CreatorClient({displayName}:{displayName:string}) {
     await navigator.clipboard.writeText(url.toString());setNotice(`${platform==="universal"?"Poll":"Tracked"} link copied.`);
   };
   const update=async(id:string,status:string)=>{await fetch("/api/creator",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({id,status})});await load()};
+  const saveEdit=async()=>{
+    if(!editing)return;
+    setBusy(true);
+    const r=await fetch("/api/creator",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({kind:"poll",...editing})});
+    const result=await r.json() as {error?:string};setBusy(false);
+    if(!r.ok)return setNotice(result.error||"Could not update that poll.");
+    setEditing(null);setNotice("Poll updated.");await load();
+  };
+  const removePoll=async(id:string)=>{
+    if(!confirm("Delete this poll? Polls with responses will be closed so their immutable evidence remains available."))return;
+    const r=await fetch(`/api/creator?id=${encodeURIComponent(id)}`,{method:"DELETE"});
+    const result=await r.json() as {error?:string;archived?:boolean};
+    if(!r.ok)return setNotice(result.error||"Could not delete that poll.");
+    setNotice(result.archived?"Poll closed. Its immutable response record was preserved.":"Poll deleted.");await load();
+  };
   const nightly=async(value:boolean)=>{setData({...data,preferences:{...data.preferences,nightlyResults:value}});await fetch("/api/creator",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({kind:"preferences",nightlyResults:value})})};
   const initials=displayName.split(/\s|@/).filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase();
   return <main className="creator-shell">
@@ -41,10 +57,11 @@ export default function CreatorClient({displayName}:{displayName:string}) {
     <section className="creator-content">
       {view==="home"&&<Home name={displayName} polls={data.polls} total={total} create={()=>setView("create")} results={(id)=>{setSelected(id);setView("results")}}/>}
       {view==="create"&&<Create form={form} setForm={setForm} create={create} busy={busy} aiPlan={data.preferences.aiPlan} upgrade={()=>setView("account")}/>}
-      {view==="polls"&&<Polls polls={data.polls} copy={copy} update={update} results={(id)=>{setSelected(id);setView("results")}} create={()=>setView("create")}/>}
+      {view==="polls"&&<Polls polls={data.polls} copy={copy} update={update} edit={setEditing} remove={removePoll} results={(id)=>{setSelected(id);setView("results")}} create={()=>setView("create")}/>}
       {view==="results"&&<Results polls={data.polls} active={active} selected={selected} select={setSelected} copy={copy} aiPlan={data.preferences.aiPlan} upgrade={()=>setView("account")}/>}
       {view==="account"&&<Account email={displayName} nightly={data.preferences.nightlyResults} setNightly={nightly} aiPlan={data.preferences.aiPlan}/>}
     </section>
+    {editing&&<div className="modal-backdrop" onMouseDown={()=>setEditing(null)}><div className="question-modal creator-editor" onMouseDown={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setEditing(null)}>×</button><span className="modal-step">EDIT POLL</span><h2>Update your poll</h2><textarea value={editing.prompt} onChange={e=>setEditing({...editing,prompt:e.target.value})}/><div className="two-fields"><input value={editing.optionA} onChange={e=>setEditing({...editing,optionA:e.target.value})}/><input value={editing.optionB} onChange={e=>setEditing({...editing,optionB:e.target.value})}/></div><div className="two-fields"><input placeholder="Topic" value={editing.topic||""} onChange={e=>setEditing({...editing,topic:e.target.value})}/><input placeholder="Tags" value={editing.tags||""} onChange={e=>setEditing({...editing,tags:e.target.value})}/></div><div className="modal-actions"><button onClick={()=>setEditing(null)}>Cancel</button><button className="continue" disabled={busy} onClick={saveEdit}>{busy?"Saving…":"Save changes"}</button></div></div></div>}
   </main>
 }
 
@@ -59,8 +76,13 @@ function Create({form,setForm,create,busy,aiPlan,upgrade}:{form:{prompt:string;o
   const getIdeas=async()=>{const r=await ai("ideas");if(r)setIdeas(Array.isArray(r.followUps)?r.followUps.map(String):[])};
   return <div className="creator-create"><div className="create-copy"><p>NEW POLL</p><h1>One question.<br/>That&apos;s it.</h1><span>Backgrounds are optional themes for the poll and its share card. The clean theme is always the default.</span><aside className="ai-studio"><div><b>Pollrr AI</b><span>{aiPlan==="pro"?"Active":"Upgrade"}</span></div>{aiPlan==="pro"?<><textarea placeholder="Describe what you want to learn…" value={idea} onChange={e=>setIdea(e.target.value)}/><button disabled={aiBusy!==""||idea.length<3} onClick={generate}>{aiBusy==="create"?"Writing…":"Create poll with AI"}</button><button className="ai-secondary" disabled={aiBusy!==""} onClick={getIdeas}>{aiBusy==="ideas"?"Thinking…":"Ideas from my history"}</button>{ideas.length>0&&<div className="ai-ideas">{ideas.map(x=><button onClick={()=>setIdea(x)} key={x}>{x}</button>)}</div>}</>:<><p>Generate polls, check bias, tag topics and create summaries.</p><button onClick={upgrade}>Upgrade to AI</button></>}{aiError&&<small>{aiError}</small>}</aside></div><section className={`create-card theme-${form.theme}`}><label>Your question<textarea autoFocus maxLength={180} placeholder="Should our city make downtown parking free on weekends?" value={form.prompt} onChange={e=>setForm({...form,prompt:e.target.value})}/></label><div className="creator-options"><label>Answer one<input maxLength={60} value={form.optionA} onChange={e=>setForm({...form,optionA:e.target.value})}/></label><label>Answer two<input maxLength={60} value={form.optionB} onChange={e=>setForm({...form,optionB:e.target.value})}/></label></div>{aiPlan==="pro"&&form.prompt&&<button className="ai-review-button" disabled={aiBusy!==""} onClick={reviewPoll}>{aiBusy==="review"?"Reviewing…":"Review neutrality with AI"}</button>}{review&&<div className="ai-review"><div><strong>{review.score}</strong><span>quality score</span></div><p><b>{review.verdict}</b>{review.issues.map(x=><small key={x}>• {x}</small>)}</p><button onClick={()=>setForm({...form,prompt:review.neutralRewrite,optionA:review.optionA,optionB:review.optionB})}>Use neutral rewrite</button></div>}<div className="creator-options"><label>Topic <span>optional</span><input placeholder="Housing" value={form.topic} onChange={e=>setForm({...form,topic:e.target.value})}/></label><label>Tags <span>optional</span><input placeholder="local, budget, policy" value={form.tags} onChange={e=>setForm({...form,tags:e.target.value})}/></label></div><div className="theme-row"><span>Look</span>{["paper","sunset","ocean","night"].map(theme=><button aria-label={`${theme} theme`} className={`theme-dot ${theme} ${form.theme===theme?"selected":""}`} onClick={()=>setForm({...form,theme})} key={theme}/>)}</div><label className="public-toggle"><input type="checkbox" checked={form.isPublic} onChange={e=>setForm({...form,isPublic:e.target.checked})}/><span><b>Public poll</b><small>Eligible for de-identified aggregate trends</small></span></label><button className="creator-primary" disabled={busy||form.prompt.length<6} onClick={create}>{busy?"Creating…":"Create & copy link"} <span>→</span></button></section></div>
 }
-function Polls({polls,copy,update,results,create}:{polls:Poll[];copy:(id:string,p?:string)=>void;update:(id:string,s:string)=>void;results:(id:string)=>void;create:()=>void}){
-  return <div><div className="creator-title"><div><p>YOUR LIBRARY</p><h1>My polls</h1></div><button onClick={create}>＋ New poll</button></div><div className="poll-library">{polls.length?polls.map(p=><article key={p.id}><span className={`poll-theme theme-${p.theme}`}/><div><small>{p.topic||"General"} · {new Date(p.createdAt).toLocaleDateString()}</small><h2>{p.prompt}</h2><p>{p.responses} responses · <b>{p.status}</b></p></div><div className="poll-actions"><button onClick={()=>copy(p.id)}>Copy link</button><button onClick={()=>results(p.id)}>Results</button><button onClick={()=>update(p.id,p.status==="live"?"paused":"live")}>{p.status==="live"?"Pause":"Open"}</button></div></article>):<div className="creator-empty"><h2>No polls yet.</h2><button onClick={create}>Create your first poll</button></div>}</div></div>
+function Polls({polls,copy,update,edit,remove,results,create}:{polls:Poll[];copy:(id:string,p?:string)=>void;update:(id:string,s:string)=>void;edit:(p:Poll)=>void;remove:(id:string)=>void;results:(id:string)=>void;create:()=>void}){
+  const download=(poll:Poll)=>{
+    const platforms=["universal","facebook","instagram","tiktok","reddit","discord","slack"];
+    const rows=["platform,url",...platforms.map(platform=>{const url=new URL("/",location.origin);url.searchParams.set("p",poll.id);if(platform!=="universal")url.searchParams.set("src",platform);return `${platform},${url}`})];
+    const blob=new Blob([rows.join("\n")],{type:"text/csv"});const href=URL.createObjectURL(blob);const anchor=document.createElement("a");anchor.href=href;anchor.download=`pollrr-${poll.id.slice(0,8)}-links.csv`;anchor.click();URL.revokeObjectURL(href);
+  };
+  return <div><div className="creator-title"><div><p>YOUR LIBRARY</p><h1>My polls</h1></div><button onClick={create}>＋ New poll</button></div><div className="poll-library">{polls.length?polls.map(p=><article key={p.id}><span className={`poll-theme theme-${p.theme}`}/><div><small>{p.topic||"General"} · {new Date(p.createdAt).toLocaleDateString()}</small><h2>{p.prompt}</h2><p>{p.responses} responses · <b>{p.status}</b></p></div><div className="poll-actions"><button onClick={()=>window.open(`/?p=${p.id}`,"_blank")}>Open</button><button onClick={()=>copy(p.id)}>Copy</button><button onClick={()=>download(p)}>Download links</button><button onClick={()=>results(p.id)}>Results</button><button onClick={()=>edit(p)}>Edit</button><button onClick={()=>update(p.id,p.status==="live"?"paused":"live")}>{p.status==="live"?"Pause":"Publish"}</button><button className="action-danger" onClick={()=>remove(p.id)}>Delete</button></div></article>):<div className="creator-empty"><h2>No polls yet.</h2><button onClick={create}>Create your first poll</button></div>}</div></div>
 }
 function Results({polls,active,selected,select,copy,aiPlan,upgrade}:{polls:Poll[];active?:Poll;selected:string;select:(s:string)=>void;copy:(id:string,p?:string)=>void;aiPlan:string;upgrade:()=>void}){
   const [summary,setSummary]=useState<{headline:string;summary:string;insights:string[];explanationThemes:string[];facebook:string;instagram:string;tiktok:string}|null>(null);const [aiBusy,setAiBusy]=useState(false);const [aiError,setAiError]=useState("");
