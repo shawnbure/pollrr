@@ -1023,7 +1023,11 @@ button, input, select, textarea { min-height: 44px; }
   background: #f1f2f8;
 }
 .creator-top nav button,.creator-top nav a {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
   min-height: 38px;
+  line-height:1;
   padding: 7px 14px;
   border-radius: 10px;
   color: #66697a;
