@@ -47,7 +47,7 @@ export async function GET() {
   if (!context.organizationId) return Response.json({ polls:[],preferences:{nightlyResults:false,aiPlan:"free"},platform:context.platform });
   const [polls,preferences] = await Promise.all([
     env.DB.prepare(
-      `SELECT q.id,q.prompt,q.option_a optionA,q.option_b optionB,q.topic,q.region,q.status,
+      `SELECT q.id,q.prompt,q.option_a optionA,q.option_b optionB,q.topic,q.tags,q.region,q.status,
         q.theme,q.is_public isPublic,q.created_at createdAt,
         COUNT(v.id) responses,
         SUM(CASE WHEN v.choice='a' THEN 1 ELSE 0 END) optionACount,
@@ -80,9 +80,10 @@ export async function POST(request:Request) {
   const campaignId=await defaultCampaign(context.organizationId);
   await env.DB.prepare(
     `INSERT INTO questions
-     (id,prompt,option_a,option_b,topic,region,status,scheduled_at,created_at,organization_id,campaign_id,created_by,theme,is_public)
-     VALUES (?,?,?,?,?,?,'live',NULL,?,?,?,?,?,?)`,
+     (id,prompt,option_a,option_b,topic,tags,region,status,scheduled_at,created_at,organization_id,campaign_id,created_by,theme,is_public)
+     VALUES (?,?,?,?,?, ?,?,'live',NULL,?,?,?,?,?,?)`,
   ).bind(id,prompt,optionA.slice(0,60),optionB.slice(0,60),String(body?.topic||"General").slice(0,50),
+    String(body?.tags||"").split(",").map(tag=>tag.trim().toLowerCase()).filter(Boolean).slice(0,8).join(","),
     String(body?.region||"Everywhere").slice(0,50),Date.now(),context.organizationId,campaignId,context.email,
     ["paper","sunset","ocean","night"].includes(String(body?.theme))?String(body?.theme):"paper",body?.isPublic===false?0:1).run();
   return Response.json({ id,url:`/?p=${id}` },{ status:201 });

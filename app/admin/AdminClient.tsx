@@ -11,8 +11,10 @@ type Workspace = { organization:{id:string;name:string;role:string};campaigns:Ca
 type Member = { email:string;role:string;status:string;title?:string };
 type Report = { id:string;name:string;description?:string;visibility:string;updated_at:number };
 type Organization = { id:string;name:string;status:string;plan:string;contact_email?:string;members:number;campaigns:number;responses:number };
+type PlatformPoll = { id:string;prompt:string;status:string;topic:string;tags?:string;created_by?:string;organization_name:string;responses:number;created_at:number };
 type Manage = {
   platform:boolean;organizations:Organization[];team:Member[];reports:Report[];
+  platformPolls:PlatformPoll[];
   imports:{id:string;filename:string;accepted_count:number;duplicate_count:number;audience_name:string;created_at:number}[];
   audienceMetrics:Audience[];analytics:{channels:{channel:string;responses:number;links:number;opens:number}[];daily:{day:string;responses:number;trusted:number}[]};
   audits:{actor_email:string;action:string;resource_type:string;created_at:number}[];
@@ -20,7 +22,7 @@ type Manage = {
 type Overview = { totalResponses:number;integrity?:{total:number;trusted:number;flagged:number};ledger?:{snapshot_hash:string}|null };
 type Modal = "campaign"|"poll"|"audience"|"link"|"member"|"organization"|"report"|"import"|null;
 
-const baseSections = ["Overview","Campaigns","Polls","Samples","Fieldwork","Intelligence","Integrity","Team"];
+const baseSections = ["Overview","Polls","Intelligence","Integrity","Team"];
 
 export default function AdminClient({ displayName }: { displayName:string }) {
   const [active,setActive]=useState("Overview");
@@ -41,15 +43,14 @@ export default function AdminClient({ displayName }: { displayName:string }) {
       fetch(`/api/admin/overview${query}`,{cache:"no-store"}),
     ]);
     if(w.ok)setWorkspace(await w.json());
-    if(m.ok)setManage(await m.json());
+    if(m.ok){const next=await m.json() as Manage;setManage(next);if(next.platform)setActive(current=>current==="Overview"?"Platform":current)}
     if(o.ok)setOverview(await o.json());
   },[selectedOrganization]);
   useEffect(()=>{const timer=setTimeout(load,0);return()=>clearTimeout(timer)},[load]);
 
-  const sections=manage?.platform?["Platform",...baseSections]:baseSections;
-  const navGroups=[
+  const sections=manage===null?[]:manage.platform?["Platform","Polls","Intelligence","Integrity"]:baseSections;
+  const navGroups=manage?.platform?[{label:"Control room",items:sections}]:[
     {label:"Workspace",items:sections.filter(item=>["Platform","Overview","Campaigns","Polls"].includes(item))},
-    {label:"Research operations",items:sections.filter(item=>["Samples","Fieldwork"].includes(item))},
     {label:"Evidence & analysis",items:sections.filter(item=>["Intelligence","Integrity"].includes(item))},
     {label:"Organization",items:sections.filter(item=>item==="Team")},
   ];
@@ -96,11 +97,11 @@ export default function AdminClient({ displayName }: { displayName:string }) {
       <Link className="brand admin-brand" href="/"><span className="brand-mark">p</span><span>pollrr</span></Link>
       <div className="org-switch"><span className="org-swatch">{workspace?.organization.name?.slice(0,1)||"P"}</span><div><small>ACTIVE WORKSPACE</small><b>{workspace?.organization.name||"Loading…"}</b><span>{workspace?.organization.role||"member"}</span></div></div>
       <nav className="studio-nav">{navGroups.map(group=><div className="nav-group" key={group.label}><p>{group.label}</p>{group.items.map((item)=><button className={active===item?"active":""} onClick={()=>setActive(item)} key={item}><span className={`nav-marker marker-${item.toLowerCase()}`}/><span>{item}</span>{item==="Campaigns"&&<em>{workspace?.campaigns.length||0}</em>}</button>)}</div>)}</nav>
-      <button className="sidebar-create" onClick={()=>openModal("poll")}><span>＋</span><div><b>Quick poll</b><small>Start a new question</small></div></button>
+      {!manage?.platform&&<button className="sidebar-create" onClick={()=>openModal("poll")}><span>＋</span><div><b>Quick poll</b><small>Start a new question</small></div></button>}
       <div className="sidebar-bottom"><div className="admin-user"><span>{displayName.slice(0,2).toUpperCase()}</span><div><b>{displayName}</b><small>{manage?.platform?"Platform administrator":workspace?.organization.role||"Member"}</small></div></div></div>
     </aside>
     <section className="admin-main">
-      <header className="admin-header"><div><p>{workspace?.organization.name?.toUpperCase()||"POLLRR"}</p><h1>{active}</h1></div><div className="header-actions"><button onClick={()=>window.open("/","_blank")}>Voter view</button><button className="new-btn" onClick={()=>openModal(primaryAction(active))}>＋ {primaryLabel(active)}</button></div></header>
+      <header className="admin-header"><div><p>{manage?.platform?"POLLRR CONTROL ROOM":workspace?.organization.name?.toUpperCase()||"POLLRR"}</p><h1>{active}</h1></div><div className="header-actions">{manage?.platform&&<Link className="creator-view-link" href="/admin">Creator view</Link>}<button onClick={()=>window.open("/","_blank")}>Voter view</button><button className="new-btn" onClick={()=>openModal(primaryAction(active))}>＋ {primaryLabel(active)}</button></div></header>
       {notice&&<div className="admin-notice">{notice}<button onClick={()=>setNotice("")}>×</button></div>}
 
       {active==="Overview"&&<>
@@ -118,10 +119,7 @@ export default function AdminClient({ displayName }: { displayName:string }) {
       </>}
 
       {active==="Platform"&&<Platform organizations={manage?.organizations||[]} onCreate={()=>openModal("organization")} onOpen={(id)=>{setSelectedOrganization(id);setActive("Overview")}} onEdit={(o)=>openModal("organization",{...stringify(o),contactEmail:o.contact_email||""})} onRemove={(o)=>remove("organization",o.id)}/>}
-      {active==="Campaigns"&&<Crud title="Campaigns" subtitle="Client work, objectives, and lifecycle" onCreate={()=>openModal("campaign")}>
-        {workspace?.campaigns.map(c=><section className="campaign-group" key={c.id}><div className="crud-row"><Status value={c.status}/><div><b>{c.name}</b><small>{c.objective||"No objective"}</small></div><span>{c.polls} polls</span><span>{c.clicks} opens</span><div className="row-actions"><button onClick={()=>openModal("poll",{campaignId:c.id})}>Add poll</button><button onClick={()=>openModal("campaign",{...stringify(c),kind:"campaign"})}>Edit</button><button onClick={()=>request("/api/admin/workspace","PATCH",{kind:"campaign",...c,status:"archived"})}>Archive</button><button onClick={()=>remove("campaign",c.id,"/api/admin/workspace")}>Delete</button></div></div><div className="campaign-polls">{workspace.questions.filter(q=>q.campaign_id===c.id).map(q=><div key={q.id}><Status value={q.status}/><b>{q.prompt}</b><span>{q.votes} responses</span><button onClick={()=>window.open(`/?p=${q.id}`,"_blank")}>Preview</button></div>)}</div></section>)}
-      </Crud>}
-      {active==="Polls"&&<Crud title="Poll library" subtitle="Questions, publishing state, response totals, and evidence" onCreate={()=>openModal("poll")}>
+      {active==="Polls"&&manage?.platform?<AllPolls polls={manage.platformPolls||[]}/>:active==="Polls"&&<Crud title="Poll library" subtitle="Questions, publishing state, response totals, and evidence" onCreate={()=>openModal("poll")}>
         {workspace?.questions.map(q=><div className="crud-row" key={q.id}><Status value={q.status}/><div><b>{q.prompt}</b><small>{q.campaign_name}</small></div><span>{q.votes} responses</span><a href={`/verify/${q.id}`}>Evidence</a><div className="row-actions">{q.status!=="live"&&<button onClick={()=>publish(q.id,"live")}>Publish</button>}{q.status==="live"&&<button onClick={()=>publish(q.id,"paused")}>Pause</button>}<button onClick={()=>window.open(`/?p=${q.id}`,"_blank")}>Preview</button><button onClick={()=>remove("question",q.id,"/api/admin/questions")}>Delete</button></div></div>)}
       </Crud>}
       {active==="Samples"&&<Audiences audiences={workspace?.audiences||[]} imports={manage?.imports||[]} openModal={openModal} request={request} remove={remove}/>}
@@ -142,7 +140,16 @@ function PanelHead({title,sub,action,onAction}:{title:string;sub:string;action?:
 function Status({value}:{value:string}){return <span className={`status ${value}`}>{value}</span>}
 function Crud({title,subtitle,onCreate,children}:{title:string;subtitle:string;onCreate:()=>void;children:React.ReactNode}){return <article className="panel workspace-panel"><PanelHead title={title} sub={subtitle} action="Create" onAction={onCreate}/><div className="workspace-list crud-list">{children}</div></article>}
 
-function Platform({organizations,onCreate,onOpen,onEdit,onRemove}:{organizations:Organization[];onCreate:()=>void;onOpen:(id:string)=>void;onEdit:(o:Organization)=>void;onRemove:(o:Organization)=>void}){return <Crud title="Client administration" subtitle="Clients, owners, plans, usage, and service status" onCreate={onCreate}>{organizations.map(o=><div className="crud-row client-row" key={o.id}><Status value={o.status}/><div><b>{o.name}</b><small>{o.contact_email||"No billing contact"} · {o.plan}</small></div><span>{o.members} users</span><span>{o.campaigns} campaigns</span><span>{o.responses} responses</span><div className="row-actions"><button onClick={()=>onOpen(o.id)}>Open</button><button onClick={()=>onEdit(o)}>Edit</button><button onClick={()=>onRemove(o)}>{o.campaigns||o.responses?"Archive":"Delete"}</button></div></div>)}</Crud>}
+function Platform({organizations,onCreate,onOpen,onEdit,onRemove}:{organizations:Organization[];onCreate:()=>void;onOpen:(id:string)=>void;onEdit:(o:Organization)=>void;onRemove:(o:Organization)=>void}){return <Crud title="Creator accounts" subtitle="Accounts, owners, plans, poll usage, and service status" onCreate={onCreate}>{organizations.map(o=><div className="crud-row client-row" key={o.id}><Status value={o.status}/><div><b>{o.name}</b><small>{o.contact_email||"No account email"} · {o.plan}</small></div><span>{o.members} users</span><span>{o.responses} responses</span><div className="row-actions"><button onClick={()=>onOpen(o.id)}>Open</button><button onClick={()=>onEdit(o)}>Edit</button><button onClick={()=>onRemove(o)}>{o.campaigns||o.responses?"Archive":"Delete"}</button></div></div>)}</Crud>}
+
+function AllPolls({polls}:{polls:PlatformPoll[]}){
+  const [query,setQuery]=useState("");const [creator,setCreator]=useState("");const [topic,setTopic]=useState("");const [tag,setTag]=useState("");const [sort,setSort]=useState("newest");
+  const creators=[...new Set(polls.map(p=>p.created_by||"Legacy creator"))].sort();
+  const topics=[...new Set(polls.map(p=>p.topic||"General"))].sort();
+  const tags=[...new Set(polls.flatMap(p=>(p.tags||"").split(",").filter(Boolean)))].sort();
+  const filtered=polls.filter(p=>(!query||`${p.prompt} ${p.created_by} ${p.topic} ${p.tags}`.toLowerCase().includes(query.toLowerCase()))&&(!creator||(p.created_by||"Legacy creator")===creator)&&(!topic||(p.topic||"General")===topic)&&(!tag||(p.tags||"").split(",").includes(tag))).sort((a,b)=>sort==="responses"?Number(b.responses)-Number(a.responses):sort==="creator"?(a.created_by||"").localeCompare(b.created_by||""):sort==="topic"?(a.topic||"").localeCompare(b.topic||""):Number(b.created_at)-Number(a.created_at));
+  return <article className="panel workspace-panel"><PanelHead title="All creator polls" sub="Every poll across every free creator account"/><div className="poll-filters"><input aria-label="Search polls" placeholder="Search polls, creators, topics or tags…" value={query} onChange={e=>setQuery(e.target.value)}/><select aria-label="Filter creator" value={creator} onChange={e=>setCreator(e.target.value)}><option value="">All creators</option>{creators.map(x=><option key={x}>{x}</option>)}</select><select aria-label="Filter topic" value={topic} onChange={e=>setTopic(e.target.value)}><option value="">All topics</option>{topics.map(x=><option key={x}>{x}</option>)}</select><select aria-label="Filter tag" value={tag} onChange={e=>setTag(e.target.value)}><option value="">All tags</option>{tags.map(x=><option key={x}>{x}</option>)}</select><select aria-label="Sort polls" value={sort} onChange={e=>setSort(e.target.value)}><option value="newest">Newest</option><option value="responses">Most responses</option><option value="creator">Creator</option><option value="topic">Topic</option></select></div><p className="filter-count">{filtered.length} of {polls.length} polls</p><div className="global-polls">{filtered.map(p=><article key={p.id}><Status value={p.status}/><div><small>{p.organization_name} · {p.created_by||"Legacy creator"}</small><h2>{p.prompt}</h2><p>{p.topic||"General"}{p.tags?` · ${p.tags.split(",").map(x=>`#${x}`).join(" ")}`:""} · {new Date(p.created_at).toLocaleDateString()}</p></div><strong>{p.responses}<span>responses</span></strong><div className="row-actions"><button onClick={()=>window.open(`/?p=${p.id}`,"_blank")}>Open poll</button><button onClick={()=>window.open(`/verify/${p.id}`,"_blank")}>Evidence</button></div></article>)}</div></article>
+}
 
 function Audiences({audiences,imports,openModal,request,remove}:{audiences:Audience[];imports:Manage["imports"];openModal:(m:Modal,v?:Record<string,string>)=>void;request:(u:string,m:string,p?:object)=>Promise<boolean>;remove:(r:string,id:string,e?:string)=>void}){
   return <div className="stack"><article className="panel audience-principle"><span>SAMPLE OPERATIONS</span><h2>Define the electorate you intend to measure—and prove how the sample was built.</h2><p>Sample frames combine geography, demographics, voter-file or panel sources, quotas, recruitment method, and response targets. Contact records remain encrypted and structurally separated from individual opinion records.</p></article><article className="panel workspace-panel"><PanelHead title="Sample frames" sub="Voter-file, panel, geographic, partner, organic, and owned-list cohorts" action="New sample" onAction={()=>openModal("audience")}/><div className="workspace-list">{audiences.map(a=><div className="crud-row audience-full" key={a.id}><Status value={a.status}/><div><b>{a.name}</b><small>{a.type} · {a.geography||"Any geography"} · {a.description||"Population not documented"}</small></div><span>{a.contacts||0} records</span><span>n={a.target_size||"—"}</span><div className="row-actions"><button onClick={()=>openModal("import",{audienceId:a.id})}>Add records</button><button onClick={()=>openModal("audience",stringify(a))}>Edit</button><button onClick={()=>request("/api/admin/workspace","PATCH",{kind:"audience",...a,status:"archived"})}>Archive</button><button onClick={()=>remove("audience",a.id,"/api/admin/workspace")}>Delete</button></div></div>)}</div></article><article className="panel"><PanelHead title="Sample imports" sub="Encrypted, deduplicated, and separated from individual opinion records"/><div className="workspace-list">{imports.length?imports.map(i=><div className="simple-row" key={i.id}><div><b>{i.filename}</b><small>{i.audience_name}</small></div><span>{i.accepted_count} accepted</span><span>{i.duplicate_count} duplicates</span><time>{new Date(i.created_at).toLocaleDateString()}</time></div>):<p className="empty-note">No sample records imported.</p>}</div></article></div>
