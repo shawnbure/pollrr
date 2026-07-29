@@ -12,6 +12,7 @@ type Poll = {
   optionB: string;
   topic: string;
   region: string;
+  organizationId?: string;
 };
 type Totals = { total: number; optionA: number; optionB: number };
 type Reason = { id: string; label: string };
@@ -43,6 +44,11 @@ export default function Home() {
   const [explanationSaved, setExplanationSaved] = useState(false);
   const [privateMap, setPrivateMap] = useState(false);
   const [commonGround, setCommonGround] = useState<string[]>([]);
+  const [contact, setContact] = useState("");
+  const [contactConsent, setContactConsent] = useState(false);
+  const [contactSaved, setContactSaved] = useState(false);
+  const [contactMessage, setContactMessage] = useState("");
+  const [answeredRipple, setAnsweredRipple] = useState("");
   const startedAt = useRef(0);
 
   const loadPoll = useCallback(async () => {
@@ -73,6 +79,7 @@ export default function Home() {
     if (!response.ok || !data.totals) throw new Error(data.error || "Could not count vote");
     localStorage.removeItem(PENDING_KEY);
     setChoice(data.choice ?? pending.choice);
+    setAnsweredRipple(pending.rippleId);
     setTotals(data.totals);
     setStage("result");
     if (localStorage.getItem("pollrr:private-map") === "yes") {
@@ -137,6 +144,7 @@ export default function Home() {
       choice: value,
       voterKey: deviceKey(),
       rippleId: new URLSearchParams(location.search).get("r") || crypto.randomUUID(),
+      parentRippleId: new URLSearchParams(location.search).get("parent"),
       responseMs: Date.now() - startedAt.current,
       sourceToken: new URLSearchParams(location.search).get("src"),
     };
@@ -191,6 +199,7 @@ export default function Home() {
     if (!poll) return;
     const url = new URL(location.href);
     url.searchParams.set("r", crypto.randomUUID());
+    if (answeredRipple) url.searchParams.set("parent", answeredRipple);
     const data = {
       title: "What does your circle think?",
       text: `${poll.prompt} Vote before you see the split.`,
@@ -206,6 +215,19 @@ export default function Home() {
     } catch {
       // Closing the native share sheet is a successful exit.
     }
+  };
+
+  const saveContact = async () => {
+    if (!poll?.organizationId || !contactConsent) return;
+    const response = await fetch("/api/contact", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ organizationId: poll.organizationId, contact, consent: contactConsent, interests: poll.topic }),
+    });
+    const data = await response.json() as { error?: string; maskedContact?: string };
+    if (!response.ok) return setContactMessage(data.error || "Could not save your preference.");
+    setContactSaved(true);
+    setContactMessage(`Saved ${data.maskedContact}. This contact is not linked to your vote.`);
   };
 
   const chosenCount = choice === "a" ? totals.optionA : totals.optionB;
@@ -290,6 +312,17 @@ export default function Home() {
               </>}
             </div>
             {commonGround.length > 0 && <div className="common-ground"><span>Common ground</span><b>People on both sides mentioned {commonGround.slice(0, 2).join(" and ")}.</b><small>Based only on optional human explanations.</small></div>}
+            {poll.organizationId&&<div className="contact-optin">
+              <p className="eyebrow">OPTIONAL · STAY INVOLVED</p>
+              <h2>Hear about future polls.</h2>
+              <p>Your contact information is stored in a separate vault and is never attached to this vote.</p>
+              {contactSaved?<b>{contactMessage}</b>:<>
+                <input value={contact} onChange={event=>setContact(event.target.value)} placeholder="Email or mobile number"/>
+                <label><input type="checkbox" checked={contactConsent} onChange={event=>setContactConsent(event.target.checked)}/> I want Pollrr to notify me about future polls. My information will not be sold and I can unsubscribe.</label>
+                <button disabled={!contactConsent||contact.length<6} onClick={saveContact}>Keep me involved</button>
+                {contactMessage&&<small>{contactMessage}</small>}
+              </>}
+            </div>}
             <div className="trust-links"><a href={`/verify/${poll.id}`}>Verify this result</a><a href="/methodology">Read the methodology</a><a href="/me">My private opinion map</a></div>
           </>
         )}

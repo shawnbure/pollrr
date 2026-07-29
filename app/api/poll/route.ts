@@ -11,15 +11,16 @@ type PollRow = {
   topic: string;
   region: string;
   status: string;
+  organization_id: string | null;
 };
 
 async function livePoll(questionId?: string | null): Promise<PollRow | null> {
   if (questionId) return env.DB.prepare(
-    `SELECT id, prompt, option_a, option_b, topic, region, status FROM questions
+    `SELECT id, prompt, option_a, option_b, topic, region, status, organization_id FROM questions
      WHERE id=? AND status='live' LIMIT 1`,
   ).bind(questionId).first<PollRow>();
   return env.DB.prepare(
-    `SELECT id, prompt, option_a, option_b, topic, region, status
+    `SELECT id, prompt, option_a, option_b, topic, region, status, organization_id
      FROM questions
      WHERE status = 'live'
      ORDER BY created_at DESC
@@ -52,9 +53,18 @@ export async function GET(request: Request) {
   }
   const sourceToken = url.searchParams.get("src");
   if (sourceToken) {
-    await env.DB.prepare(
-      "UPDATE distribution_links SET clicks=clicks+1 WHERE token=? AND question_id=?",
-    ).bind(sourceToken, poll.id).run();
+    const link = await env.DB.prepare(
+      "SELECT id,organization_id FROM distribution_links WHERE token=? AND question_id=? AND status='active'",
+    ).bind(sourceToken, poll.id).first<{ id: string; organization_id: string }>();
+    if (link) await env.DB.batch([
+      env.DB.prepare("UPDATE distribution_links SET clicks=clicks+1 WHERE id=?").bind(link.id),
+      env.DB.prepare(
+        `INSERT INTO distribution_events
+         (id,organization_id,distribution_link_id,event_type,referrer_class,created_at)
+         VALUES (?,?,?,'open',?,?)`,
+      ).bind(crypto.randomUUID(), link.organization_id, link.id,
+        request.headers.get("referer") ? "external_referrer" : "direct", Date.now()),
+    ]);
   }
 
   const reasons = await env.DB.prepare(
@@ -69,6 +79,7 @@ export async function GET(request: Request) {
       topic: poll.topic,
       region: poll.region,
       status: poll.status,
+      organizationId: poll.organization_id,
     },
     reasons: reasons.results,
     resultPolicy: "Results unlock only after a human answer is counted.",
@@ -147,8 +158,8 @@ export async function POST(request: Request) {
   const integrityReason = integrityStatus === "flagged" ? "response_under_900ms" : "passed_v1_checks";
   const distribution = body.sourceToken
     ? await env.DB.prepare(
-      "SELECT channel FROM distribution_links WHERE token=? AND question_id=?",
-    ).bind(body.sourceToken, body.questionId).first<{ channel: string }>()
+      "SELECT id,organization_id,channel FROM distribution_links WHERE token=? AND question_id=?",
+    ).bind(body.sourceToken, body.questionId).first<{ id: string; organization_id: string; channel: string }>()
     : null;
   const sourceClass = distribution ? `channel:${distribution.channel}` : body.parentRippleId || body.rippleId ? "referred" : "direct";
   const eventId = crypto.randomUUID();
@@ -191,6 +202,18 @@ export async function POST(request: Request) {
     eventId, id, body.questionId, payloadHash, integrityStatus, integrityReason,
     responseMs, sourceClass, createdAt,
   ).run();
+
+  if (distribution) {
+    await env.DB.batch([
+      env.DB.prepare("UPDATE distribution_links SET responses=responses+1 WHERE id=?").bind(distribution.id),
+      env.DB.prepare(
+        `INSERT INTO distribution_events
+         (id,organization_id,distribution_link_id,event_type,ripple_id,parent_ripple_id,referrer_class,created_at)
+         VALUES (?,?,?,'response',?,?,?,?)`,
+      ).bind(crypto.randomUUID(), distribution.organization_id, distribution.id, rippleId,
+        body.parentRippleId?.slice(0, 80) || null, sourceClass, createdAt),
+    ]);
+  }
 
   if (body.reasonId || body.explanation?.trim()) {
     const reason = body.reasonId

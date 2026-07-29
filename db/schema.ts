@@ -142,3 +142,104 @@ export const distributionLinks = sqliteTable("distribution_links", {
   clicks: integer("clicks").notNull().default(0),
   createdAt: integer("created_at").notNull(),
 }, (table) => [index("distribution_campaign_idx").on(table.campaignId, table.createdAt)]);
+
+export const platformAdmins = sqliteTable("platform_admins", {
+  email: text("email").primaryKey(),
+  role: text("role").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const audienceImports = sqliteTable("audience_imports", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id),
+  audienceId: text("audience_id").notNull().references(() => audiences.id),
+  filename: text("filename").notNull(),
+  rowCount: integer("row_count").notNull(),
+  acceptedCount: integer("accepted_count").notNull(),
+  duplicateCount: integer("duplicate_count").notNull(),
+  status: text("status").notNull(),
+  createdBy: text("created_by").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const audienceContacts = sqliteTable("audience_contacts", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id),
+  audienceId: text("audience_id").notNull().references(() => audiences.id),
+  channel: text("channel").notNull(),
+  contactCiphertext: text("contact_ciphertext").notNull(),
+  contactHash: text("contact_hash").notNull(),
+  maskedContact: text("masked_contact").notNull(),
+  firstNameCiphertext: text("first_name_ciphertext"),
+  consentStatus: text("consent_status").notNull(),
+  consentSource: text("consent_source").notNull(),
+  consentText: text("consent_text").notNull(),
+  consentedAt: integer("consented_at"),
+  revokedAt: integer("revoked_at"),
+  createdAt: integer("created_at").notNull(),
+}, (table) => [
+  uniqueIndex("audience_contacts_dedupe_idx").on(table.organizationId, table.contactHash),
+  index("audience_contacts_audience_idx").on(table.audienceId, table.consentStatus),
+]);
+
+export const contactOptIns = sqliteTable("contact_opt_ins", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id),
+  channel: text("channel").notNull(),
+  contactCiphertext: text("contact_ciphertext").notNull(),
+  contactHash: text("contact_hash").notNull(),
+  maskedContact: text("masked_contact").notNull(),
+  interests: text("interests"),
+  consentVersion: text("consent_version").notNull(),
+  consentText: text("consent_text").notNull(),
+  status: text("status").notNull(),
+  createdAt: integer("created_at").notNull(),
+  revokedAt: integer("revoked_at"),
+}, (table) => [uniqueIndex("contact_opt_ins_dedupe_idx").on(table.organizationId, table.contactHash)]);
+
+export const integrations = sqliteTable("integrations", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id),
+  provider: text("provider").notNull(),
+  accountLabel: text("account_label"),
+  status: text("status").notNull(),
+  capabilities: text("capabilities").notNull(),
+  createdBy: text("created_by").notNull(),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+}, (table) => [uniqueIndex("integrations_org_provider_idx").on(table.organizationId, table.provider)]);
+
+export const distributionEvents = sqliteTable("distribution_events", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id),
+  distributionLinkId: text("distribution_link_id").notNull().references(() => distributionLinks.id),
+  eventType: text("event_type").notNull(),
+  rippleId: text("ripple_id"),
+  parentRippleId: text("parent_ripple_id"),
+  referrerClass: text("referrer_class"),
+  createdAt: integer("created_at").notNull(),
+}, (table) => [index("distribution_events_link_idx").on(table.distributionLinkId, table.createdAt)]);
+
+export const savedReports = sqliteTable("saved_reports", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull().references(() => organizations.id),
+  campaignId: text("campaign_id").references(() => campaigns.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  filtersJson: text("filters_json").notNull(),
+  visibility: text("visibility").notNull(),
+  createdBy: text("created_by").notNull(),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+export const auditLog = sqliteTable("audit_log", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id"),
+  actorEmail: text("actor_email").notNull(),
+  action: text("action").notNull(),
+  resourceType: text("resource_type").notNull(),
+  resourceId: text("resource_id"),
+  detailsJson: text("details_json").notNull(),
+  createdAt: integer("created_at").notNull(),
+});

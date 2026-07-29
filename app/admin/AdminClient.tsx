@@ -3,105 +3,180 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-type Campaign = { id:string; name:string; objective?:string; status:string; polls:number; links:number; clicks:number };
-type Audience = { id:string; name:string; description?:string; geography?:string };
-type Poll = { id:string; prompt:string; status:string; campaign_id:string; campaign_name:string; votes:number };
-type LinkRow = { id:string; question_id:string; label:string; channel:string; token:string; clicks:number; prompt:string; audience_name?:string };
-type Workspace = { organization:{id:string;name:string;role:string}; campaigns:Campaign[]; audiences:Audience[]; questions:Poll[]; links:LinkRow[] };
-type Overview = { totalResponses:number; integrity?:{total:number;trusted:number;flagged:number}; ledger?:{snapshot_hash:string}|null };
+type Campaign = { id:string;name:string;objective?:string;status:string;polls:number;links:number;clicks:number };
+type Audience = { id:string;name:string;description?:string;geography?:string;type:string;status:string;target_size?:number;consent_basis?:string;contacts:number;consented:number };
+type Poll = { id:string;prompt:string;status:string;campaign_id:string;campaign_name:string;votes:number };
+type LinkRow = { id:string;question_id:string;label:string;channel:string;token:string;clicks:number;responses:number;status:string;prompt:string;audience_name?:string };
+type Workspace = { organization:{id:string;name:string;role:string};campaigns:Campaign[];audiences:Audience[];questions:Poll[];links:LinkRow[] };
+type Member = { email:string;role:string;status:string;title?:string };
+type Report = { id:string;name:string;description?:string;visibility:string;updated_at:number };
+type Integration = { id:string;provider:string;account_label?:string;status:string;capabilities:string };
+type Organization = { id:string;name:string;status:string;plan:string;contact_email?:string;members:number;campaigns:number;responses:number };
+type Manage = {
+  platform:boolean;organizations:Organization[];team:Member[];reports:Report[];integrations:Integration[];
+  imports:{id:string;filename:string;accepted_count:number;duplicate_count:number;audience_name:string;created_at:number}[];
+  audienceMetrics:Audience[];analytics:{channels:{channel:string;responses:number;links:number;opens:number}[];daily:{day:string;responses:number;trusted:number}[]};
+  audits:{actor_email:string;action:string;resource_type:string;created_at:number}[];
+};
+type Overview = { totalResponses:number;integrity?:{total:number;trusted:number;flagged:number};ledger?:{snapshot_hash:string}|null };
+type Modal = "campaign"|"poll"|"audience"|"link"|"member"|"organization"|"report"|"import"|"integration"|null;
 
-const sections = ["Overview","Campaigns","Polls","Audiences","Distribution","Results","Integrity","Reports","Team"];
+const baseSections = ["Overview","Campaigns","Polls","Audiences","Distribution","Reports","Integrity","Team","Integrations"];
 
 export default function AdminClient({ displayName }: { displayName:string }) {
   const [active,setActive]=useState("Overview");
   const [workspace,setWorkspace]=useState<Workspace|null>(null);
+  const [manage,setManage]=useState<Manage|null>(null);
   const [overview,setOverview]=useState<Overview|null>(null);
-  const [modal,setModal]=useState<"campaign"|"poll"|"audience"|"link"|null>(null);
+  const [modal,setModal]=useState<Modal>(null);
   const [form,setForm]=useState<Record<string,string>>({});
   const [notice,setNotice]=useState("");
   const [busy,setBusy]=useState(false);
+  const [selectedOrganization,setSelectedOrganization]=useState("");
 
   const load=useCallback(async()=>{
-    const [w,o]=await Promise.all([
-      fetch("/api/admin/workspace",{cache:"no-store"}),
-      fetch("/api/admin/overview",{cache:"no-store"}),
+    const query=selectedOrganization?`?organizationId=${encodeURIComponent(selectedOrganization)}`:"";
+    const [w,m,o]=await Promise.all([
+      fetch(`/api/admin/workspace${query}`,{cache:"no-store"}),
+      fetch(`/api/admin/manage${query}`,{cache:"no-store"}),
+      fetch(`/api/admin/overview${query}`,{cache:"no-store"}),
     ]);
     if(w.ok)setWorkspace(await w.json());
+    if(m.ok)setManage(await m.json());
     if(o.ok)setOverview(await o.json());
-  },[]);
+  },[selectedOrganization]);
   useEffect(()=>{const timer=setTimeout(load,0);return()=>clearTimeout(timer)},[load]);
 
-  const create=async()=>{
-    setBusy(true);
-    const endpoint=modal==="poll"?"/api/admin/questions":"/api/admin/workspace";
-    const payload=modal==="poll"
-      ? {prompt:form.prompt,optionA:form.optionA,optionB:form.optionB,topic:form.topic,region:form.region,campaignId:form.campaignId}
-      : {kind:modal,...form};
-    const response=await fetch(endpoint,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
-    const data=await response.json() as {error?:string;url?:string};
-    setBusy(false);
-    if(!response.ok)return setNotice(data.error||"Could not save.");
-    if(data.url){await navigator.clipboard.writeText(`${location.origin}${data.url}`);setNotice("Tracked link created and copied.");}
-    else setNotice(`${modal?.[0].toUpperCase()}${modal?.slice(1)} created.`);
-    setModal(null);setForm({});await load();
-  };
-  const publish=async(id:string,status:string)=>{
-    await fetch("/api/admin/questions",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({id,status})});await load();
-  };
-  const openModal=(kind:typeof modal)=>{
+  const sections=manage?.platform?["Platform",...baseSections]:baseSections;
+  const openModal=(kind:Modal,values:Record<string,string>={})=>{
     setForm({
-      campaignId:workspace?.campaigns[0]?.id||"",
-      questionId:workspace?.questions[0]?.id||"",
-      audienceId:workspace?.audiences[0]?.id||"",
-      channel:"link",
+      campaignId:workspace?.campaigns[0]?.id||"",questionId:workspace?.questions[0]?.id||"",
+      audienceId:workspace?.audiences[0]?.id||"",channel:"social",type:"organic",status:"draft",
+      role:"viewer",visibility:"workspace",provider:"facebook",plan:"pilot",...values,
     });setModal(kind);
   };
+  const request=async(url:string,method:string,payload?:object)=>{
+    setBusy(true);setNotice("");
+    const scopedPayload=payload&&selectedOrganization?{...payload,organizationId:selectedOrganization}:payload;
+    const response=await fetch(url,{method,headers:scopedPayload?{"content-type":"application/json"}:undefined,body:scopedPayload?JSON.stringify(scopedPayload):undefined});
+    const data=await response.json().catch(()=>({})) as {error?:string;url?:string};
+    setBusy(false);
+    if(!response.ok){setNotice(data.error||"That action could not be completed.");return false}
+    setModal(null);setForm({});setNotice("Saved.");await load();return true;
+  };
+  const create=async()=>{
+    if(form.id&&["campaign","audience"].includes(modal||""))return request("/api/admin/workspace","PATCH",{kind:modal,...form,organizationId:selectedOrganization});
+    if(modal==="poll")return request("/api/admin/questions","POST",{...form,campaignId:form.campaignId});
+    if(["campaign","audience","link"].includes(modal||""))return request("/api/admin/workspace","POST",{kind:modal,...form,organizationId:selectedOrganization});
+    return request("/api/admin/manage","POST",{kind:modal,...form,organizationId:selectedOrganization,confirmedConsent:form.confirmedConsent==="yes"});
+  };
+  const remove=(resource:string,id:string,endpoint="/api/admin/manage")=>{
+    if(!confirm("Remove this record? Records with immutable history will be archived instead."))return;
+    const org=selectedOrganization?`&organizationId=${encodeURIComponent(selectedOrganization)}`:"";
+    request(`${endpoint}?${endpoint.includes("workspace")?"kind":"resource"}=${resource}&id=${encodeURIComponent(id)}${org}`,"DELETE");
+  };
+  const publish=(id:string,status:string)=>request("/api/admin/questions","PATCH",{id,status});
+  const linkFor=(link:LinkRow)=>`${location.origin}/?p=${link.question_id}&src=${link.token}`;
+  const shareLink=async(link:LinkRow)=>{
+    const url=linkFor(link);const text=`Vote before you see the split: ${link.prompt}`;
+    if(navigator.share)await navigator.share({title:"Pollrr",text,url}).catch(()=>{});
+    else {await navigator.clipboard.writeText(`${text} ${url}`);setNotice("Share message copied.")}
+  };
   const trusted=overview?.integrity?.total?Math.round(Number(overview.integrity.trusted)/Number(overview.integrity.total)*100):100;
+  const responseRate=(link:LinkRow)=>link.clicks?Math.round(link.responses/link.clicks*100):0;
 
   return <main className="admin-shell modern-admin">
     <aside className="sidebar">
       <Link className="brand admin-brand" href="/"><span className="brand-mark">p</span><span>pollrr</span></Link>
       <div className="org-switch"><small>ORGANIZATION</small><b>{workspace?.organization.name||"Loading…"}</b><span>{workspace?.organization.role||"member"}</span></div>
-      <nav>{sections.map((item,i)=><button className={active===item?"active":""} onClick={()=>setActive(item)} key={item}><span className="nav-icon">{["⌂","◫","●","◎","↗","▥","◇","⇩","♙"][i]}</span>{item}{item==="Campaigns"&&<em>{workspace?.campaigns.length||0}</em>}</button>)}</nav>
-      <div className="sidebar-bottom"><div className="admin-user"><span>{displayName.slice(0,2).toUpperCase()}</span><div><b>{displayName}</b><small>Workspace owner</small></div></div></div>
+      <nav>{sections.map((item)=><button className={active===item?"active":""} onClick={()=>setActive(item)} key={item}><span className="nav-icon">{navIcon(item)}</span>{item}{item==="Campaigns"&&<em>{workspace?.campaigns.length||0}</em>}</button>)}</nav>
+      <div className="sidebar-bottom"><div className="admin-user"><span>{displayName.slice(0,2).toUpperCase()}</span><div><b>{displayName}</b><small>{manage?.platform?"Platform administrator":workspace?.organization.role||"Member"}</small></div></div></div>
     </aside>
     <section className="admin-main">
-      <header className="admin-header"><div><p>{workspace?.organization.name?.toUpperCase()||"POLLRR"}</p><h1>{active}</h1></div><div className="header-actions"><button onClick={()=>window.open("/","_blank")}>Open voter view</button><button className="new-btn" onClick={()=>openModal("campaign")}>＋ New campaign</button></div></header>
+      <header className="admin-header"><div><p>{workspace?.organization.name?.toUpperCase()||"POLLRR"}</p><h1>{active}</h1></div><div className="header-actions"><button onClick={()=>window.open("/","_blank")}>Voter view</button><button className="new-btn" onClick={()=>openModal(primaryAction(active))}>＋ {primaryLabel(active)}</button></div></header>
       {notice&&<div className="admin-notice">{notice}<button onClick={()=>setNotice("")}>×</button></div>}
 
-      {active==="Overview"&&<><div className="metric-grid admin-metrics">
-        <article><div className="metric-top"><span>Active campaigns</span><i>Workspace</i></div><b>{workspace?.campaigns.filter(c=>c.status==="active").length||0}</b><small>{workspace?.campaigns.length||0} total campaigns</small></article>
-        <article><div className="metric-top"><span>Human responses</span><i className="green">Live</i></div><b>{Number(overview?.totalResponses||0).toLocaleString()}</b><small>Never blended with model estimates</small></article>
-        <article><div className="metric-top"><span>Distribution</span><i>Tracked</i></div><b>{workspace?.links.length||0}</b><small>{workspace?.links.reduce((n,l)=>n+Number(l.clicks),0)||0} link opens</small></article>
-        <article><div className="metric-top"><span>Signal integrity</span><i>Auditable</i></div><b>{trusted}<span>% trusted</span></b><small>{overview?.integrity?.flagged||0} flagged for review</small></article>
-      </div><div className="admin-grid">
-        <article className="panel"><div className="panel-head"><div><h2>Campaign portfolio</h2><p>Organization-separated work</p></div><button onClick={()=>setActive("Campaigns")}>View all →</button></div><div className="workspace-list">{workspace?.campaigns.slice(0,4).map(c=><div key={c.id}><span className={`status ${c.status}`}>{c.status}</span><b>{c.name}</b><small>{c.polls} polls · {c.links} links · {c.clicks} opens</small></div>)}</div></article>
-        <article className="panel launch-panel"><span>LAUNCH WORKFLOW</span><h2>Campaign → poll → audience → tracked link</h2><div><button onClick={()=>openModal("poll")}>Create poll</button><button onClick={()=>openModal("audience")}>Add audience</button><button onClick={()=>openModal("link")}>Distribute</button></div></article>
-      </div></>}
+      {active==="Overview"&&<>
+        <div className="metric-grid admin-metrics">
+          <Metric label="Active campaigns" value={workspace?.campaigns.filter(c=>c.status==="active").length||0} note={`${workspace?.campaigns.length||0} total`}/>
+          <Metric label="Human responses" value={Number(overview?.totalResponses||0).toLocaleString()} note="Never blended with estimates"/>
+          <Metric label="Reach" value={workspace?.links.reduce((n,l)=>n+Number(l.clicks),0)||0} note={`${workspace?.links.length||0} tracked paths`}/>
+          <Metric label="Signal integrity" value={`${trusted}%`} note={`${overview?.integrity?.flagged||0} flagged for review`}/>
+        </div>
+        <div className="admin-grid">
+          <article className="panel"><PanelHead title="Operating pipeline" sub="Create → recruit → distribute → verify → publish"/><div className="workflow-strip">{["Campaign","Poll","Audience","Distribution","Evidence"].map((x,i)=><button key={x} onClick={()=>setActive(["Campaigns","Polls","Audiences","Distribution","Integrity"][i])}><span>{i+1}</span><b>{x}</b></button>)}</div></article>
+          <article className="panel launch-panel"><span>THE POLLRR MOAT</span><h2>Every response can be distributed, verified, and publicly audited.</h2><div><button onClick={()=>openModal("link")}>Launch distribution</button><button onClick={()=>setActive("Integrity")}>Open evidence</button></div></article>
+        </div>
+        <ReportDashboard workspace={workspace} manage={manage} overview={overview}/>
+      </>}
 
-      {active==="Campaigns"&&<WorkspaceTable title="Campaigns" action="New campaign" onAction={()=>openModal("campaign")}>{workspace?.campaigns.map(c=><div className="data-row campaign-row" key={c.id}><span className={`status ${c.status}`}>{c.status}</span><div><b>{c.name}</b><small>{c.objective||"No objective added"}</small></div><span>{c.polls} polls</span><span>{c.links} links</span><span>{c.clicks} opens</span></div>)}</WorkspaceTable>}
-      {active==="Polls"&&<WorkspaceTable title="Poll library" action="New poll" onAction={()=>openModal("poll")}>{workspace?.questions.map(q=><div className="data-row poll-row" key={q.id}><span className={`status ${q.status}`}>{q.status}</span><div><b>{q.prompt}</b><small>{q.campaign_name}</small></div><span>{q.votes} votes</span><div className="row-actions">{q.status!=="live"&&<button onClick={()=>publish(q.id,"live")}>Publish</button>}{q.status==="live"&&<button onClick={()=>publish(q.id,"paused")}>Pause</button>}<button onClick={()=>window.open(`/?p=${q.id}`,"_blank")}>Preview</button></div></div>)}</WorkspaceTable>}
-      {active==="Audiences"&&<WorkspaceTable title="Audience definitions" action="New audience" onAction={()=>openModal("audience")}>{workspace?.audiences.map(a=><div className="data-row audience-row" key={a.id}><div><b>{a.name}</b><small>{a.description||"No description"}</small></div><span>{a.geography||"Any geography"}</span><em>Privacy-safe definition</em></div>)}</WorkspaceTable>}
-      {active==="Distribution"&&<WorkspaceTable title="Tracked distribution" action="Create link" onAction={()=>openModal("link")}>{workspace?.links.map(l=><div className="data-row distribution-row" key={l.id}><span className="channel-pill">{l.channel}</span><div><b>{l.label}</b><small>{l.prompt}</small></div><span>{l.audience_name||"Open audience"}</span><b>{l.clicks} opens</b><button onClick={()=>navigator.clipboard.writeText(`${location.origin}/?p=${l.question_id}&src=${l.token}`)}>Copy link</button></div>)}</WorkspaceTable>}
-      {["Results","Integrity","Reports","Team"].includes(active)&&<FeaturePanel active={active} workspace={workspace} overview={overview}/>}
+      {active==="Platform"&&<Platform organizations={manage?.organizations||[]} onCreate={()=>openModal("organization")} onOpen={(id)=>{setSelectedOrganization(id);setActive("Overview")}}/>}
+      {active==="Campaigns"&&<Crud title="Campaigns" subtitle="Client work, objectives, and lifecycle" onCreate={()=>openModal("campaign")}>
+        {workspace?.campaigns.map(c=><div className="crud-row" key={c.id}><Status value={c.status}/><div><b>{c.name}</b><small>{c.objective||"No objective"}</small></div><span>{c.polls} polls</span><span>{c.clicks} opens</span><div className="row-actions"><button onClick={()=>openModal("campaign",{...stringify(c),kind:"campaign"})}>Edit</button><button onClick={()=>request("/api/admin/workspace","PATCH",{kind:"campaign",...c,status:"archived"})}>Archive</button><button onClick={()=>remove("campaign",c.id,"/api/admin/workspace")}>Delete</button></div></div>)}
+      </Crud>}
+      {active==="Polls"&&<Crud title="Poll library" subtitle="Questions, publishing state, response totals, and evidence" onCreate={()=>openModal("poll")}>
+        {workspace?.questions.map(q=><div className="crud-row" key={q.id}><Status value={q.status}/><div><b>{q.prompt}</b><small>{q.campaign_name}</small></div><span>{q.votes} responses</span><a href={`/verify/${q.id}`}>Evidence</a><div className="row-actions">{q.status!=="live"&&<button onClick={()=>publish(q.id,"live")}>Publish</button>}{q.status==="live"&&<button onClick={()=>publish(q.id,"paused")}>Pause</button>}<button onClick={()=>window.open(`/?p=${q.id}`,"_blank")}>Preview</button><button onClick={()=>remove("question",q.id,"/api/admin/questions")}>Delete</button></div></div>)}
+      </Crud>}
+      {active==="Audiences"&&<Audiences audiences={workspace?.audiences||[]} imports={manage?.imports||[]} openModal={openModal} request={request} remove={remove}/>}
+      {active==="Distribution"&&<Distribution links={workspace?.links||[]} linkFor={linkFor} shareLink={shareLink} responseRate={responseRate} openModal={openModal} request={request} remove={remove}/>}
+      {active==="Reports"&&<Reports workspace={workspace} manage={manage} overview={overview} openModal={openModal} remove={remove}/>}
+      {active==="Integrity"&&<Integrity workspace={workspace} overview={overview}/>}
+      {active==="Team"&&<Team members={manage?.team||[]} openModal={openModal} request={request} remove={remove}/>}
+      {active==="Integrations"&&<Integrations items={manage?.integrations||[]} openModal={openModal} remove={remove}/>}
     </section>
     {modal&&<EditorModal kind={modal} form={form} setForm={setForm} workspace={workspace} busy={busy} close={()=>setModal(null)} save={create}/>}
   </main>;
 }
 
-function WorkspaceTable({title,action,onAction,children}:{title:string;action:string;onAction:()=>void;children:React.ReactNode}){return <article className="panel workspace-panel"><div className="panel-head"><div><h2>{title}</h2><p>Cloudflare-backed workspace data</p></div><button onClick={onAction}>{action} ＋</button></div><div className="workspace-list">{children}</div></article>}
+function navIcon(item:string){return ({Platform:"◆",Overview:"⌂",Campaigns:"▣",Polls:"●",Audiences:"◎",Distribution:"↗",Reports:"▥",Integrity:"◇",Team:"♙",Integrations:"⌁"} as Record<string,string>)[item]}
+function primaryAction(active:string):Modal{return ({Platform:"organization",Campaigns:"campaign",Polls:"poll",Audiences:"audience",Distribution:"link",Reports:"report",Team:"member",Integrations:"integration"} as Record<string,Modal>)[active]||"campaign"}
+function primaryLabel(active:string){return ({Platform:"New client",Campaigns:"New campaign",Polls:"New poll",Audiences:"New audience",Distribution:"New distribution",Reports:"New report",Team:"Invite member",Integrations:"Add integration"} as Record<string,string>)[active]||"New campaign"}
+function stringify(value:object){return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,String(v??"")]))}
+function Metric({label,value,note}:{label:string;value:string|number;note:string}){return <article><div className="metric-top"><span>{label}</span><i>Live</i></div><b>{value}</b><small>{note}</small></article>}
+function PanelHead({title,sub,action,onAction}:{title:string;sub:string;action?:string;onAction?:()=>void}){return <div className="panel-head"><div><h2>{title}</h2><p>{sub}</p></div>{action&&<button onClick={onAction}>{action} ＋</button>}</div>}
+function Status({value}:{value:string}){return <span className={`status ${value}`}>{value}</span>}
+function Crud({title,subtitle,onCreate,children}:{title:string;subtitle:string;onCreate:()=>void;children:React.ReactNode}){return <article className="panel workspace-panel"><PanelHead title={title} sub={subtitle} action="Create" onAction={onCreate}/><div className="workspace-list crud-list">{children}</div></article>}
 
-function FeaturePanel({active,workspace,overview}:{active:string;workspace:Workspace|null;overview:Overview|null}){
-  const copy:{[key:string]:[string,string]}={Results:["Human results","Compare campaigns, sources, audiences, explanations, and longitudinal shifts without mixing in modeled estimates."],Integrity:["Signal integrity","Review trusted and flagged human responses; flags remain auditable and never silently erase votes."],Reports:["Research reports","Create methodology-aware briefs with sampling limits, verified aggregates, common ground, and downloadable audit manifests."],Team:["Organization access","Invite analysts, editors, and viewers with organization-scoped roles."]};
-  return <article className="panel feature-workspace"><span>{active.toUpperCase()}</span><h2>{copy[active][0]}</h2><p>{copy[active][1]}</p><div className="feature-kpis"><div><b>{active==="Integrity"?overview?.integrity?.flagged||0:workspace?.campaigns.length||0}</b><small>{active==="Integrity"?"flagged responses":"campaigns in workspace"}</small></div><div><b>{overview?.totalResponses||0}</b><small>raw human responses</small></div><div><b>0</b><small>synthetic votes</small></div></div>{active==="Results"&&workspace?.questions.map(q=><div className="result-line" key={q.id}><b>{q.prompt}</b><span>{q.votes} responses</span><a href={`/api/insights/${q.id}`}>Open aggregate data →</a></div>)}</article>
+function Platform({organizations,onCreate,onOpen}:{organizations:Organization[];onCreate:()=>void;onOpen:(id:string)=>void}){return <Crud title="Client administration" subtitle="Tenants, owners, plans, usage, and service status" onCreate={onCreate}>{organizations.map(o=><div className="crud-row client-row" key={o.id}><Status value={o.status}/><div><b>{o.name}</b><small>{o.contact_email||"No billing contact"} · {o.plan}</small></div><span>{o.members} users</span><span>{o.campaigns} campaigns</span><span>{o.responses} responses</span><button onClick={()=>onOpen(o.id)}>Open workspace</button></div>)}</Crud>}
+
+function Audiences({audiences,imports,openModal,request,remove}:{audiences:Audience[];imports:Manage["imports"];openModal:(m:Modal,v?:Record<string,string>)=>void;request:(u:string,m:string,p?:object)=>Promise<boolean>;remove:(r:string,id:string,e?:string)=>void}){
+  return <div className="stack"><article className="panel workspace-panel"><PanelHead title="Audience recruitment" sub="Uploaded, organic, partner, and geographic cohorts" action="New audience" onAction={()=>openModal("audience")}/><div className="workspace-list">{audiences.map(a=><div className="crud-row audience-full" key={a.id}><Status value={a.status}/><div><b>{a.name}</b><small>{a.type} · {a.geography||"Any geography"} · {a.consent_basis||"Consent basis not documented"}</small></div><span>{a.consented||0}/{a.contacts||0} consented</span><span>Goal {a.target_size||"—"}</span><div className="row-actions"><button onClick={()=>openModal("import",{audienceId:a.id})}>Import</button><button onClick={()=>openModal("audience",stringify(a))}>Edit</button><button onClick={()=>request("/api/admin/workspace","PATCH",{kind:"audience",...a,status:"archived"})}>Archive</button><button onClick={()=>remove("audience",a.id,"/api/admin/workspace")}>Delete</button></div></div>)}</div></article>
+  <article className="panel"><PanelHead title="Import history" sub="Encrypted contact vault; never joined to individual votes"/><div className="workspace-list">{imports.map(i=><div className="simple-row" key={i.id}><div><b>{i.filename}</b><small>{i.audience_name}</small></div><span>{i.accepted_count} accepted</span><span>{i.duplicate_count} duplicates</span><time>{new Date(i.created_at).toLocaleDateString()}</time></div>)}</div></article></div>
 }
 
-function EditorModal({kind,form,setForm,workspace,busy,close,save}:{kind:"campaign"|"poll"|"audience"|"link";form:Record<string,string>;setForm:(v:Record<string,string>)=>void;workspace:Workspace|null;busy:boolean;close:()=>void;save:()=>void}){
+function Distribution({links,linkFor,shareLink,responseRate,openModal,request,remove}:{links:LinkRow[];linkFor:(l:LinkRow)=>string;shareLink:(l:LinkRow)=>void;responseRate:(l:LinkRow)=>number;openModal:(m:Modal)=>void;request:(u:string,m:string,p?:object)=>Promise<boolean>;remove:(r:string,id:string,e?:string)=>void}){
+  return <div className="stack"><article className="panel distribution-hero"><span>RIPPLE DISTRIBUTION STUDIO</span><h2>Turn every respondent, partner, publisher, and physical location into a measurable recruitment branch.</h2><div className="distribution-actions"><button onClick={()=>openModal("link")}>Create tracked path</button><button onClick={()=>window.print()}>Print distribution kit</button></div></article>
+  <Crud title="Distribution paths" subtitle="One source-specific path per partner, placement, creator, or channel" onCreate={()=>openModal("link")}>{links.map(l=><div className="crud-row distribution-full" key={l.id}><span className="channel-pill">{l.channel}</span><div><b>{l.label}</b><small>{l.prompt} · {l.audience_name||"Open audience"}</small></div><span>{l.clicks} opens</span><span>{l.responses} responses</span><b>{responseRate(l)}%</b><div className="row-actions"><button onClick={()=>navigator.clipboard.writeText(linkFor(l))}>Copy</button><button onClick={()=>shareLink(l)}>Share</button><button onClick={()=>navigator.clipboard.writeText(`<iframe src="${linkFor(l)}" title="Pollrr poll"></iframe>`)}>Embed</button><button onClick={()=>request("/api/admin/workspace","PATCH",{kind:"link",...l,status:l.status==="active"?"paused":"active"})}>{l.status==="active"?"Pause":"Activate"}</button><button onClick={()=>remove("link",l.id,"/api/admin/workspace")}>Delete</button></div></div>)}</Crud></div>
+}
+
+function ReportDashboard({workspace,manage,overview}:{workspace:Workspace|null;manage:Manage|null;overview:Overview|null}){
+  const daily=[...(manage?.analytics.daily||[])].reverse();const max=Math.max(1,...daily.map(d=>Number(d.responses)));
+  return <div className="report-grid"><article className="panel"><PanelHead title="Response trend" sub="Verified human responses by day"/><div className="bar-chart">{daily.length?daily.map(d=><div key={d.day} title={`${d.day}: ${d.responses}`}><i style={{height:`${Math.max(8,Number(d.responses)/max*100)}%`}}/><small>{d.day.slice(5)}</small></div>):<p>No responses in this period.</p>}</div></article><article className="panel"><PanelHead title="Channel performance" sub="Reach and response contribution"/><div className="channel-table">{manage?.analytics.channels.map(c=><div key={c.channel}><b>{c.channel}</b><span>{c.opens||0} opens</span><span>{c.responses} responses</span></div>)}</div></article><article className="panel evidence-card"><span>PUBLIC EVIDENCE</span><b>{overview?.ledger?.snapshot_hash?.slice(0,18)||"Awaiting first snapshot"}…</b><small>Latest signed aggregate commitment</small><a href={workspace?.questions[0]?`/verify/${workspace.questions[0].id}`:"/methodology"}>Open verification center →</a></article></div>
+}
+
+function Reports({workspace,manage,overview,openModal,remove}:{workspace:Workspace|null;manage:Manage|null;overview:Overview|null;openModal:(m:Modal)=>void;remove:(r:string,id:string)=>void}){return <div className="stack"><ReportDashboard workspace={workspace} manage={manage} overview={overview}/><article className="panel"><PanelHead title="Saved reports" sub="Reusable client views with documented filters and methodology" action="Save report" onAction={()=>openModal("report")}/><div className="workspace-list">{manage?.reports.map(r=><div className="simple-row" key={r.id}><div><b>{r.name}</b><small>{r.description||"No description"} · {r.visibility}</small></div><time>{new Date(r.updated_at).toLocaleDateString()}</time><button onClick={()=>remove("report",r.id)}>Delete</button></div>)}</div></article><article className="panel"><PanelHead title="Poll drill-down" sub="Results, qualitative reasons, common ground, longitudinal snapshots, and proofs"/><div className="workspace-list">{workspace?.questions.map(q=><div className="simple-row" key={q.id}><div><b>{q.prompt}</b><small>{q.campaign_name} · {q.votes} responses</small></div><a href={`/api/insights/${q.id}`}>Aggregate data</a><a href={`/verify/${q.id}`}>Evidence page</a></div>)}</div></article></div>}
+
+function Integrity({workspace,overview}:{workspace:Workspace|null;overview:Overview|null}){return <div className="stack"><article className="panel feature-workspace"><span>TRUST CENTER</span><h2>Auditable by design.</h2><p>Votes remain append-only. Public snapshots prove aggregate integrity without exposing respondent identities or monetizable row-level data.</p><div className="feature-kpis"><div><b>{overview?.integrity?.trusted||0}</b><small>trusted events</small></div><div><b>{overview?.integrity?.flagged||0}</b><small>flagged, never silently erased</small></div><div><b>0</b><small>synthetic votes</small></div></div></article><article className="panel"><PanelHead title="Published evidence" sub="Methodology, signed snapshots, and reproducible aggregates"/><div className="workspace-list">{workspace?.questions.map(q=><div className="simple-row" key={q.id}><div><b>{q.prompt}</b><small>{q.votes} immutable human responses</small></div><a href={`/verify/${q.id}`}>Verify</a><a href={`/api/ledger/${q.id}`}>Manifest</a></div>)}</div><div className="trust-links"><a href="/methodology">Published methodology</a><a href="/privacy">Privacy and contact separation</a></div></article></div>}
+
+function Team({members,openModal,request,remove}:{members:Member[];openModal:(m:Modal)=>void;request:(u:string,m:string,p?:object)=>Promise<boolean>;remove:(r:string,id:string)=>void}){return <Crud title="Team and access" subtitle="Organization-scoped roles and invitation status" onCreate={()=>openModal("member")}>{members.map(m=><div className="crud-row team-row" key={m.email}><span className="avatar">{m.email.slice(0,2).toUpperCase()}</span><div><b>{m.email}</b><small>{m.title||"Team member"}</small></div><Status value={m.status}/><select value={m.role} onChange={e=>request("/api/admin/manage","PATCH",{resource:"member",id:m.email,role:e.target.value,status:m.status})}>{["owner","admin","analyst","editor","viewer"].map(r=><option key={r}>{r}</option>)}</select><button onClick={()=>remove("member",m.email)}>Remove</button></div>)}</Crud>}
+
+function Integrations({items,openModal,remove}:{items:Integration[];openModal:(m:Modal)=>void;remove:(r:string,id:string)=>void}){const providers=["facebook","instagram","tiktok","linkedin","email","sms","embed"];return <div className="integration-grid">{providers.map(p=>{const item=items.find(i=>i.provider===p);return <article className="panel integration-card" key={p}><span>{p.slice(0,2).toUpperCase()}</span><h2>{p}</h2><p>{integrationCopy(p)}</p><Status value={item?.status||"available"}/>{item?<button onClick={()=>remove("integration",item.id)}>Remove</button>:<button onClick={()=>openModal("integration",{provider:p})}>Configure</button>}</article>})}</div>}
+function integrationCopy(provider:string){return provider==="embed"?"Interactive website and publisher embeds.":provider==="email"||provider==="sms"?"Consent-aware outreach with source tracking.":"Export ready-made creative and tracked share paths; authenticated publishing follows provider approval."}
+
+function EditorModal({kind,form,setForm,workspace,busy,close,save}:{kind:Exclude<Modal,null>;form:Record<string,string>;setForm:(v:Record<string,string>)=>void;workspace:Workspace|null;busy:boolean;close:()=>void;save:()=>void}){
   const field=(key:string,value:string)=>setForm({...form,[key]:value});
-  return <div className="modal-backdrop" onMouseDown={close}><div className="question-modal admin-editor" onMouseDown={e=>e.stopPropagation()}><button className="modal-close" onClick={close}>×</button><span className="modal-step">NEW {kind.toUpperCase()}</span><h2>{kind==="link"?"Create a tracked distribution link":`Create ${kind}`}</h2>
-    {kind==="campaign"&&<><input placeholder="Campaign name" value={form.name||""} onChange={e=>field("name",e.target.value)}/><textarea placeholder="Objective and decisions this campaign should inform" value={form.objective||""} onChange={e=>field("objective",e.target.value)}/></>}
+  const file=async(e:React.ChangeEvent<HTMLInputElement>)=>{const selected=e.target.files?.[0];if(selected)setForm({...form,filename:selected.name,csv:await selected.text()})};
+  return <div className="modal-backdrop" onMouseDown={close}><div className="question-modal admin-editor" onMouseDown={e=>e.stopPropagation()}><button className="modal-close" onClick={close}>×</button><span className="modal-step">{form.id?"EDIT":"NEW"} {kind.toUpperCase()}</span><h2>{modalTitle(kind)}</h2>
+    {kind==="organization"&&<><input placeholder="Client organization" value={form.name||""} onChange={e=>field("name",e.target.value)}/><input type="email" placeholder="Owner email" value={form.contactEmail||""} onChange={e=>field("contactEmail",e.target.value)}/><select value={form.plan} onChange={e=>field("plan",e.target.value)}>{["pilot","professional","enterprise"].map(x=><option key={x}>{x}</option>)}</select></>}
+    {kind==="campaign"&&<><input placeholder="Campaign name" value={form.name||""} onChange={e=>field("name",e.target.value)}/><textarea placeholder="Decision this campaign should inform" value={form.objective||""} onChange={e=>field("objective",e.target.value)}/>{form.id&&<select value={form.status} onChange={e=>field("status",e.target.value)}>{["draft","active","paused","archived"].map(x=><option key={x}>{x}</option>)}</select>}</>}
     {kind==="poll"&&<><select value={form.campaignId} onChange={e=>field("campaignId",e.target.value)}>{workspace?.campaigns.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select><textarea placeholder="Ask one neutral question" value={form.prompt||""} onChange={e=>field("prompt",e.target.value)}/><div className="two-fields"><input placeholder="Option A" value={form.optionA||""} onChange={e=>field("optionA",e.target.value)}/><input placeholder="Option B" value={form.optionB||""} onChange={e=>field("optionB",e.target.value)}/></div><div className="two-fields"><input placeholder="Topic" value={form.topic||""} onChange={e=>field("topic",e.target.value)}/><input placeholder="Region" value={form.region||""} onChange={e=>field("region",e.target.value)}/></div></>}
-    {kind==="audience"&&<><input placeholder="Audience name" value={form.name||""} onChange={e=>field("name",e.target.value)}/><textarea placeholder="Who should this represent?" value={form.description||""} onChange={e=>field("description",e.target.value)}/><input placeholder="Geography" value={form.geography||""} onChange={e=>field("geography",e.target.value)}/></>}
-    {kind==="link"&&<><select value={form.questionId} onChange={e=>field("questionId",e.target.value)}>{workspace?.questions.map(q=><option value={q.id} key={q.id}>{q.prompt}</option>)}</select><select value={form.audienceId} onChange={e=>field("audienceId",e.target.value)}><option value="">Open audience</option>{workspace?.audiences.map(a=><option value={a.id} key={a.id}>{a.name}</option>)}</select><div className="two-fields"><select value={form.channel} onChange={e=>field("channel",e.target.value)}>{["link","email","sms","social","partner","qr","embed","paid"].map(c=><option key={c}>{c}</option>)}</select><input placeholder="Link label" value={form.label||""} onChange={e=>field("label",e.target.value)}/></div></>}
-    <div className="modal-actions"><button onClick={close}>Cancel</button><button className="continue" disabled={busy} onClick={save}>{busy?"Saving…":"Create →"}</button></div></div></div>
+    {kind==="audience"&&<><input placeholder="Audience name" value={form.name||""} onChange={e=>field("name",e.target.value)}/><div className="two-fields"><select value={form.type} onChange={e=>field("type",e.target.value)}>{["uploaded","organic","partner","geographic"].map(x=><option key={x}>{x}</option>)}</select><input type="number" placeholder="Response target" value={form.target_size||form.targetSize||""} onChange={e=>field("targetSize",e.target.value)}/></div><textarea placeholder="Who should this represent?" value={form.description||""} onChange={e=>field("description",e.target.value)}/><input placeholder="Geography" value={form.geography||""} onChange={e=>field("geography",e.target.value)}/><textarea placeholder="Consent or lawful recruitment basis" value={form.consent_basis||form.consentBasis||""} onChange={e=>field("consentBasis",e.target.value)}/></>}
+    {kind==="link"&&<><select value={form.questionId} onChange={e=>field("questionId",e.target.value)}>{workspace?.questions.map(q=><option value={q.id} key={q.id}>{q.prompt}</option>)}</select><select value={form.audienceId} onChange={e=>field("audienceId",e.target.value)}><option value="">Open audience</option>{workspace?.audiences.map(a=><option value={a.id} key={a.id}>{a.name}</option>)}</select><div className="two-fields"><select value={form.channel} onChange={e=>field("channel",e.target.value)}>{["social","email","sms","partner","creator","qr","embed","paid","event"].map(c=><option key={c}>{c}</option>)}</select><input placeholder="Partner, placement, or source label" value={form.label||""} onChange={e=>field("label",e.target.value)}/></div></>}
+    {kind==="member"&&<><input type="email" placeholder="Team member email" value={form.email||""} onChange={e=>field("email",e.target.value)}/><input placeholder="Title (optional)" value={form.title||""} onChange={e=>field("title",e.target.value)}/><select value={form.role} onChange={e=>field("role",e.target.value)}>{["admin","analyst","editor","viewer"].map(r=><option key={r}>{r}</option>)}</select></>}
+    {kind==="report"&&<><input placeholder="Report name" value={form.name||""} onChange={e=>field("name",e.target.value)}/><textarea placeholder="What decision should this report support?" value={form.description||""} onChange={e=>field("description",e.target.value)}/><select value={form.campaignId} onChange={e=>field("campaignId",e.target.value)}><option value="">All campaigns</option>{workspace?.campaigns.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select><select value={form.visibility} onChange={e=>field("visibility",e.target.value)}>{["workspace","private","public_evidence"].map(x=><option key={x}>{x}</option>)}</select></>}
+    {kind==="integration"&&<><select value={form.provider} onChange={e=>field("provider",e.target.value)}>{["facebook","instagram","tiktok","linkedin","email","sms","embed"].map(p=><option key={p}>{p}</option>)}</select><input placeholder="Account or integration label" value={form.accountLabel||""} onChange={e=>field("accountLabel",e.target.value)}/><p>Pollrr will enable creative export and tracked sharing now. Direct publishing requires the provider’s OAuth approval and credentials.</p></>}
+    {kind==="import"&&<><select value={form.audienceId} onChange={e=>field("audienceId",e.target.value)}>{workspace?.audiences.map(a=><option value={a.id} key={a.id}>{a.name}</option>)}</select><label className="file-drop">Upload CSV<input type="file" accept=".csv,text/csv" onChange={file}/><small>Required column: email, phone, or contact. Optional: first_name.</small></label><textarea placeholder="Or paste CSV here" value={form.csv||""} onChange={e=>field("csv",e.target.value)}/><textarea placeholder="Describe the permission to contact these people" value={form.consentText||""} onChange={e=>field("consentText",e.target.value)}/><label className="consent-check"><input type="checkbox" checked={form.confirmedConsent==="yes"} onChange={e=>field("confirmedConsent",e.target.checked?"yes":"no")}/> I confirm these contacts may lawfully receive invitations. Unconfirmed contacts are stored as pending and cannot be messaged.</label></>}
+    <div className="modal-actions"><button onClick={close}>Cancel</button><button className="continue" disabled={busy} onClick={save}>{busy?"Saving…":"Save →"}</button></div>
+  </div></div>
 }
+function modalTitle(kind:string){return ({organization:"Add a client",campaign:"Create a campaign",poll:"Create a poll",audience:"Define an audience",link:"Create a distribution path",member:"Invite a team member",report:"Save a report",import:"Import audience contacts",integration:"Configure distribution"} as Record<string,string>)[kind]}
