@@ -1133,6 +1133,19 @@ button, input, select, textarea { min-height: 44px; }
 .creator-content { padding-top:34px; }
 .creator-title { margin-bottom:22px; }
 .creator-title h1 { font-size:clamp(44px,5vw,64px); }
+.creator-title select {
+  min-height:46px;
+  border:1px solid #dfe1ea;
+  border-radius:12px;
+  background:#fff;
+  color:#343246;
+  padding:9px 42px 9px 14px;
+  box-shadow:0 6px 18px rgba(43,38,80,.05);
+}
+.creator-title select:focus {
+  outline:3px solid rgba(116,87,245,.14);
+  border-color:#7457f5;
+}
 .poll-library,.global-polls,.modern-admin .crud-list {
   scrollbar-width:thin;
   scrollbar-color:#aaa0e8 #eef0f6;
