@@ -40,3 +40,10 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# Local scratch / agent output — not for version control
+output/
+outputs/
+tmp/
+.artifacts/
+*.tsbuildinfo
