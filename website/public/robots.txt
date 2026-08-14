@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://pollrr.com/sitemap.xml

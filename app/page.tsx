@@ -30,7 +30,7 @@ function deviceKey() {
   return key;
 }
 
-export default function Home() {
+export default function Home({ publicToken }: { publicToken?:string } = {}) {
   const [poll, setPoll] = useState<Poll | null>(null);
   const [totals, setTotals] = useState<Totals>({ total: 0, optionA: 0, optionB: 0 });
   const [choice, setChoice] = useState<Choice | null>(null);
@@ -53,7 +53,9 @@ export default function Home() {
 
   const loadPoll = useCallback(async () => {
     try {
-      const response = await fetch(`/api/poll${location.search}`, { cache: "no-store" });
+      const query = new URLSearchParams(location.search);
+      if (publicToken) query.set("t", publicToken);
+      const response = await fetch(`/api/poll?${query}`, { cache: "no-store" });
       if (!response.ok) throw new Error("No live poll");
       const data = await response.json() as { poll: Poll; reasons: Reason[] };
       setPoll(data.poll);
@@ -63,7 +65,7 @@ export default function Home() {
     } catch {
       setStage("empty");
     }
-  }, []);
+  }, [publicToken]);
 
   const sendVote = useCallback(async (pending: PendingVote) => {
     const response = await fetch("/api/poll", {

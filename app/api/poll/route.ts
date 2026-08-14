@@ -17,8 +17,8 @@ type PollRow = {
 async function livePoll(questionId?: string | null): Promise<PollRow | null> {
   if (questionId) return env.DB.prepare(
     `SELECT id, prompt, option_a, option_b, topic, region, status, organization_id FROM questions
-     WHERE id=? AND status='live' LIMIT 1`,
-  ).bind(questionId).first<PollRow>();
+     WHERE (public_token=? OR id=?) AND status='live' LIMIT 1`,
+  ).bind(questionId, questionId).first<PollRow>();
   return env.DB.prepare(
     `SELECT id, prompt, option_a, option_b, topic, region, status, organization_id
      FROM questions
@@ -47,7 +47,7 @@ async function totals(questionId: string) {
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const poll = await livePoll(url.searchParams.get("p"));
+  const poll = await livePoll(url.searchParams.get("t") || url.searchParams.get("p"));
   if (!poll) {
     return Response.json({ error: "No poll is live right now." }, { status: 404 });
   }

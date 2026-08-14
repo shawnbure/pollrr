@@ -38,13 +38,13 @@ export async function GET(request: Request) {
     )
       .bind(member.organization_id).all(),
     env.DB.prepare(
-      `SELECT dl.*, q.prompt, a.name audience_name
+      `SELECT dl.*, q.prompt, q.public_token, a.name audience_name
        FROM distribution_links dl JOIN questions q ON q.id=dl.question_id
        LEFT JOIN audiences a ON a.id=dl.audience_id
        WHERE dl.organization_id=? ORDER BY dl.created_at DESC`,
     ).bind(member.organization_id).all(),
     env.DB.prepare(
-      `SELECT q.id,q.prompt,q.status,q.campaign_id,c.name campaign_name,COUNT(v.id) votes
+      `SELECT q.id,q.public_token,q.prompt,q.status,q.campaign_id,c.name campaign_name,COUNT(v.id) votes
        FROM questions q LEFT JOIN campaigns c ON c.id=q.campaign_id
        LEFT JOIN votes v ON v.question_id=q.id
        WHERE q.organization_id=? GROUP BY q.id ORDER BY q.created_at DESC`,
@@ -85,8 +85,8 @@ export async function POST(request: Request) {
   }
   if (body.kind === "link") {
     const question = await env.DB.prepare(
-      "SELECT id,campaign_id FROM questions WHERE id=? AND organization_id=?",
-    ).bind(body.questionId, member.organization_id).first<{ id: string; campaign_id: string }>();
+      "SELECT id,public_token,campaign_id FROM questions WHERE id=? AND organization_id=?",
+    ).bind(body.questionId, member.organization_id).first<{ id: string; public_token:string; campaign_id: string }>();
     if (!question?.campaign_id) return Response.json({ error: "Choose a campaign poll." }, { status: 400 });
     const token = crypto.randomUUID().replaceAll("-", "").slice(0, 16);
     await env.DB.prepare(
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
        (id,organization_id,campaign_id,question_id,audience_id,channel,label,token,clicks,created_at)
        VALUES (?,?,?,?,?,?,?,?,0,?)`,
     ).bind(id, member.organization_id, question.campaign_id, question.id, body.audienceId || null, body.channel || "link", body.label?.trim().slice(0, 100) || "Campaign link", token, now).run();
-    return Response.json({ id, kind: body.kind, token, url: `/?p=${question.id}&src=${token}` }, { status: 201 });
+    return Response.json({ id, kind: body.kind, token, url: `/p/${question.public_token}?src=${token}` }, { status: 201 });
   }
   return Response.json({ error: "Unsupported request." }, { status: 400 });
 }

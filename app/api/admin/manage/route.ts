@@ -50,7 +50,7 @@ export async function GET(request: Request) {
         (SELECT COUNT(*) FROM votes v JOIN questions q ON q.id=v.question_id WHERE q.organization_id=o.id) responses
        FROM organizations o ORDER BY o.created_at DESC`,
     ).all(),env.DB.prepare(
-      `SELECT q.id,q.prompt,q.option_a optionA,q.option_b optionB,q.status,q.topic,q.tags,q.region,q.created_by,q.created_at,o.name organization_name,
+      `SELECT q.id,q.public_token publicToken,q.prompt,q.option_a optionA,q.option_b optionB,q.status,q.topic,q.tags,q.region,q.created_by,q.created_at,o.name organization_name,
         COUNT(v.id) responses
        FROM questions q JOIN organizations o ON o.id=q.organization_id
        LEFT JOIN votes v ON v.question_id=q.id
@@ -95,7 +95,7 @@ export async function GET(request: Request) {
        FROM organizations o ORDER BY o.created_at DESC`,
     ).all() : Promise.resolve({ results: [] }),
     member.platform_role ? env.DB.prepare(
-      `SELECT q.id,q.prompt,q.option_a optionA,q.option_b optionB,q.status,q.topic,q.tags,q.region,q.created_by,q.created_at,o.name organization_name,
+      `SELECT q.id,q.public_token publicToken,q.prompt,q.option_a optionA,q.option_b optionB,q.status,q.topic,q.tags,q.region,q.created_by,q.created_at,o.name organization_name,
         COUNT(v.id) responses
        FROM questions q JOIN organizations o ON o.id=q.organization_id
        LEFT JOIN votes v ON v.question_id=q.id

@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../../chatgpt-auth";
+import { createPublicToken } from "../../../lib/public-token";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
   }
 
   const id = crypto.randomUUID();
+  const publicToken = createPublicToken();
   const campaign = body?.campaignId
     ? await env.DB.prepare(
       `SELECT c.id,c.organization_id FROM campaigns c
@@ -40,10 +42,11 @@ export async function POST(request: Request) {
   if (!campaign) return Response.json({ error: "Choose a campaign." }, { status: 400 });
   await env.DB.prepare(
     `INSERT INTO questions
-      (id, prompt, option_a, option_b, topic, region, status, scheduled_at, created_at, organization_id, campaign_id)
-     VALUES (?, ?, ?, ?, ?, ?, 'draft', NULL, ?, ?, ?)`,
+      (id, public_token, prompt, option_a, option_b, topic, region, status, scheduled_at, created_at, organization_id, campaign_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', NULL, ?, ?, ?)`,
   ).bind(
     id,
+    publicToken,
     prompt,
     body?.optionA?.trim().slice(0, 60) || "Yes",
     body?.optionB?.trim().slice(0, 60) || "No",
@@ -54,7 +57,7 @@ export async function POST(request: Request) {
     campaign.id,
   ).run();
 
-  return Response.json({ id, status: "draft" }, { status: 201 });
+  return Response.json({ id, publicToken, status: "draft" }, { status: 201 });
 }
 
 export async function PATCH(request: Request) {

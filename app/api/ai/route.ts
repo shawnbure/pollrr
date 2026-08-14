@@ -6,16 +6,52 @@ export const dynamic="force-dynamic";
 type AiBinding={run:(model:string,input:object)=>Promise<unknown>};
 type AiResponse={response?:unknown};
 const MODEL="@cf/meta/llama-3.1-8b-instruct-fast";
+const FREE_ACTIONS_PER_MONTH=10;
+
+function usagePeriod(){
+  return new Date().toISOString().slice(0,7);
+}
 
 async function access(){
   const user=await getChatGPTUser();
   if(!user)return null;
-  const [platform,preference,membership]=await Promise.all([
+  const period=usagePeriod();
+  const [platform,preference,membership,usage]=await Promise.all([
     env.DB.prepare("SELECT role FROM platform_admins WHERE email=?").bind(user.email).first(),
     env.DB.prepare("SELECT ai_plan FROM creator_preferences WHERE email=?").bind(user.email).first<{ai_plan:string}>(),
     env.DB.prepare("SELECT organization_id FROM organization_members WHERE email=? AND status='active' ORDER BY created_at LIMIT 1").bind(user.email).first<{organization_id:string}>(),
+    env.DB.prepare("SELECT actions FROM creator_ai_usage WHERE email=? AND period=?").bind(user.email,period).first<{actions:number}>(),
   ]);
-  return {email:user.email,organizationId:membership?.organization_id||"",allowed:Boolean(platform)||preference?.ai_plan==="pro"};
+  const plan=preference?.ai_plan||"free";
+  return {
+    email:user.email,
+    organizationId:membership?.organization_id||"",
+    period,
+    plan,
+    unlimited:Boolean(platform)||plan==="pro",
+    used:Number(usage?.actions||0),
+  };
+}
+
+async function consumeCredit(account:NonNullable<Awaited<ReturnType<typeof access>>>){
+  if(account.unlimited)return true;
+  const result=await env.DB.prepare(
+    `INSERT INTO creator_ai_usage (email,period,actions,updated_at)
+     VALUES (?,?,1,?)
+     ON CONFLICT(email,period) DO UPDATE SET
+       actions=creator_ai_usage.actions+1,
+       updated_at=excluded.updated_at
+     WHERE creator_ai_usage.actions<?
+     RETURNING actions`,
+  ).bind(account.email,account.period,Date.now(),FREE_ACTIONS_PER_MONTH).first<{actions:number}>();
+  return Boolean(result);
+}
+
+async function refundCredit(account:NonNullable<Awaited<ReturnType<typeof access>>>){
+  if(account.unlimited)return;
+  await env.DB.prepare(
+    "UPDATE creator_ai_usage SET actions=MAX(0,actions-1),updated_at=? WHERE email=? AND period=?",
+  ).bind(Date.now(),account.email,account.period).run();
 }
 
 function schema(properties:Record<string,object>,required:string[]){
@@ -33,14 +69,26 @@ async function generate(system:string,user:string,responseFormat:object){
 export async function POST(request:Request){
   const account=await access();
   if(!account)return Response.json({error:"Unauthorized"},{status:401});
-  if(!account.allowed)return Response.json({error:"Pollrr AI upgrade required.",upgradeRequired:true},{status:402});
   const body=await request.json().catch(()=>null) as Record<string,unknown>|null;
   const action=String(body?.action||"");
   const guard="You are Pollrr AI, a careful polling editor. Never invent responses. Avoid persuasion, partisan targeting, loaded framing, and false claims. Return only the requested JSON.";
+  if(!["create","review","ideas","summary"].includes(action)){
+    return Response.json({error:"Unsupported AI action."},{status:400});
+  }
+  if(!await consumeCredit(account)){
+    return Response.json({
+      error:`You used all ${FREE_ACTIONS_PER_MONTH} free AI actions for ${account.period}. Join the AI launch list for paid access.`,
+      upgradeRequired:true,
+      remaining:0,
+    },{status:402});
+  }
   try{
     if(action==="create"){
       const idea=String(body?.idea||"").trim().slice(0,800);
-      if(idea.length<3)return Response.json({error:"Describe what you want to ask."},{status:400});
+      if(idea.length<3){
+        await refundCredit(account);
+        return Response.json({error:"Describe what you want to ask."},{status:400});
+      }
       const result=await generate(guard,`Turn this idea into one clear, neutral, fast poll with two distinct choices: ${idea}`,schema({
         question:{type:"string"},optionA:{type:"string"},optionB:{type:"string"},topic:{type:"string"},
         tags:{type:"array",items:{type:"string"},maxItems:6},note:{type:"string"},
@@ -73,7 +121,10 @@ export async function POST(request:Request){
          FROM questions q LEFT JOIN votes v ON v.question_id=q.id
          WHERE q.id=? AND q.organization_id=? GROUP BY q.id`,
       ).bind(questionId,account.organizationId).first();
-      if(!poll)return Response.json({error:"Poll not found."},{status:404});
+      if(!poll){
+        await refundCredit(account);
+        return Response.json({error:"Poll not found."},{status:404});
+      }
       const reasons=await env.DB.prepare(
         `SELECT qr.label,COUNT(e.id) mentions FROM question_reasons qr
          LEFT JOIN explanations e ON e.reason_id=qr.id WHERE qr.question_id=?
@@ -86,8 +137,8 @@ export async function POST(request:Request){
       },["headline","summary","insights","explanationThemes","facebook","instagram","tiktok"]));
       return Response.json(result);
     }
-    return Response.json({error:"Unsupported AI action."},{status:400});
   }catch(error){
+    await refundCredit(account);
     return Response.json({error:error instanceof Error?error.message:"AI request failed."},{status:502});
   }
 }

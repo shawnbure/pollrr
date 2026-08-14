@@ -1,9 +1,15 @@
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
+import { createPublicToken } from "../../lib/public-token";
 
 export const dynamic = "force-dynamic";
 
 type CreatorContext = { email:string; organizationId:string; platform:boolean };
+const FREE_AI_ACTIONS=10;
+
+function aiUsagePeriod(){
+  return new Date().toISOString().slice(0,7);
+}
 
 async function creatorContext(create = false): Promise<CreatorContext | null> {
   const user = await getChatGPTUser();
@@ -44,10 +50,14 @@ async function defaultCampaign(organizationId:string) {
 export async function GET() {
   const context = await creatorContext();
   if (!context) return Response.json({ error:"Unauthorized" },{ status:401 });
-  if (!context.organizationId) return Response.json({ polls:[],preferences:{nightlyResults:false,aiPlan:"free"},platform:context.platform });
-  const [polls,preferences] = await Promise.all([
+  if (!context.organizationId) return Response.json({
+    polls:[],
+    preferences:{nightlyResults:false,aiPlan:"free",aiLimit:FREE_AI_ACTIONS,aiRemaining:FREE_AI_ACTIONS,aiWaitlist:false},
+    platform:context.platform,
+  });
+  const [polls,preferences,aiUsage] = await Promise.all([
     env.DB.prepare(
-      `SELECT q.id,q.prompt,q.option_a optionA,q.option_b optionB,q.topic,q.tags,q.region,q.status,
+      `SELECT q.id,q.public_token publicToken,q.prompt,q.option_a optionA,q.option_b optionB,q.topic,q.tags,q.region,q.status,
         q.theme,q.is_public isPublic,q.created_at createdAt,
         COUNT(v.id) responses,
         SUM(CASE WHEN v.choice='a' THEN 1 ELSE 0 END) optionACount,
@@ -57,12 +67,22 @@ export async function GET() {
        WHERE q.organization_id=? AND (q.created_by=? OR q.created_by IS NULL)
        GROUP BY q.id ORDER BY q.created_at DESC`,
     ).bind(context.organizationId,context.email).all(),
-    env.DB.prepare("SELECT nightly_results,ai_plan FROM creator_preferences WHERE email=?")
-      .bind(context.email).first<{ nightly_results:number;ai_plan:string }>(),
+    env.DB.prepare("SELECT nightly_results,ai_plan,ai_waitlist FROM creator_preferences WHERE email=?")
+      .bind(context.email).first<{ nightly_results:number;ai_plan:string;ai_waitlist:number }>(),
+    env.DB.prepare("SELECT actions FROM creator_ai_usage WHERE email=? AND period=?")
+      .bind(context.email,aiUsagePeriod()).first<{ actions:number }>(),
   ]);
+  const aiPlan=context.platform?"pro":preferences?.ai_plan||"free";
+  const aiLimit=context.platform||aiPlan==="pro"?-1:FREE_AI_ACTIONS;
   return Response.json({
     polls:polls.results,
-    preferences:{nightlyResults:Boolean(preferences?.nightly_results),aiPlan:preferences?.ai_plan||"free"},
+    preferences:{
+      nightlyResults:Boolean(preferences?.nightly_results),
+      aiPlan,
+      aiLimit,
+      aiRemaining:aiLimit<0?-1:Math.max(0,aiLimit-Number(aiUsage?.actions||0)),
+      aiWaitlist:Boolean(preferences?.ai_waitlist),
+    },
     platform:context.platform,
   });
 }
@@ -77,16 +97,17 @@ export async function POST(request:Request) {
   if (prompt.length < 6 || prompt.length > 180) return Response.json({ error:"Ask a question between 6 and 180 characters." },{ status:400 });
   if (!optionA || !optionB) return Response.json({ error:"Add two answer choices." },{ status:400 });
   const id=crypto.randomUUID();
+  const publicToken=createPublicToken();
   const campaignId=await defaultCampaign(context.organizationId);
   await env.DB.prepare(
     `INSERT INTO questions
-     (id,prompt,option_a,option_b,topic,tags,region,status,scheduled_at,created_at,organization_id,campaign_id,created_by,theme,is_public)
-     VALUES (?,?,?,?,?, ?,?,'live',NULL,?,?,?,?,?,?)`,
-  ).bind(id,prompt,optionA.slice(0,60),optionB.slice(0,60),String(body?.topic||"General").slice(0,50),
+     (id,public_token,prompt,option_a,option_b,topic,tags,region,status,scheduled_at,created_at,organization_id,campaign_id,created_by,theme,is_public)
+     VALUES (?,?,?,?,?,?, ?,?,'live',NULL,?,?,?,?,?,?)`,
+  ).bind(id,publicToken,prompt,optionA.slice(0,60),optionB.slice(0,60),String(body?.topic||"General").slice(0,50),
     String(body?.tags||"").split(",").map(tag=>tag.trim().toLowerCase()).filter(Boolean).slice(0,8).join(","),
     String(body?.region||"Everywhere").slice(0,50),Date.now(),context.organizationId,campaignId,context.email,
     ["paper","sunset","ocean","night"].includes(String(body?.theme))?String(body?.theme):"paper",body?.isPublic===false?0:1).run();
-  return Response.json({ id,url:`/?p=${id}` },{ status:201 });
+  return Response.json({ id,publicToken,url:`/p/${publicToken}` },{ status:201 });
 }
 
 export async function PATCH(request:Request) {
@@ -101,6 +122,15 @@ export async function PATCH(request:Request) {
        ON CONFLICT(email) DO UPDATE SET nightly_results=excluded.nightly_results,updated_at=excluded.updated_at`,
     ).bind(context.email,body.nightlyResults?1:0,now,now).run();
     return Response.json({ saved:true });
+  }
+  if (body?.kind==="aiWaitlist") {
+    const now=Date.now();
+    await env.DB.prepare(
+      `INSERT INTO creator_preferences (email,nightly_results,ai_plan,ai_waitlist,created_at,updated_at)
+       VALUES (?,0,'free',1,?,?)
+       ON CONFLICT(email) DO UPDATE SET ai_waitlist=1,updated_at=excluded.updated_at`,
+    ).bind(context.email,now,now).run();
+    return Response.json({ joined:true });
   }
   if (body?.kind==="poll") {
     const id=String(body.id||"");

@@ -2,6 +2,7 @@ import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqli
 
 export const questions = sqliteTable("questions", {
   id: text("id").primaryKey(),
+  publicToken: text("public_token"),
   prompt: text("prompt").notNull(),
   optionA: text("option_a").notNull(),
   optionB: text("option_b").notNull(),
@@ -12,7 +13,7 @@ export const questions = sqliteTable("questions", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   organizationId: text("organization_id"),
   campaignId: text("campaign_id"),
-});
+}, (table) => [uniqueIndex("questions_public_token_idx").on(table.publicToken)]);
 
 export const votes = sqliteTable("votes", {
   id: text("id").primaryKey(),
