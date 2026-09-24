@@ -10,6 +10,17 @@ type View="home"|"create"|"polls"|"results"|"account";
 
 const publicPollOrigin=()=>location.hostname==="app.pollrr.com"?"https://pollrr.com":location.origin;
 
+async function copyText(text:string){
+  try{
+    if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(text);return true}
+  }catch{}
+  const area=document.createElement("textarea");
+  area.value=text;area.setAttribute("readonly","");area.style.position="fixed";area.style.opacity="0";area.style.pointerEvents="none";
+  document.body.appendChild(area);area.select();area.setSelectionRange(0,text.length);
+  const copied=document.execCommand("copy");area.remove();
+  return copied;
+}
+
 export default function CreatorClient({displayName,initialView="home"}:{displayName:string;initialView?:View}) {
   const [data,setData]=useState<CreatorData>({polls:[],preferences:{nightlyResults:false,aiPlan:"free",aiLimit:10,aiRemaining:10,aiWaitlist:false},platform:false});
   const [view,setView]=useState<View>(initialView);
@@ -36,7 +47,7 @@ export default function CreatorClient({displayName,initialView="home"}:{displayN
   };
   const copy=async(publicToken:string,platform="universal")=>{
     const url=new URL(`/p/${publicToken}`,publicPollOrigin());if(platform!=="universal")url.searchParams.set("src",platform);
-    await navigator.clipboard.writeText(url.toString());setNotice(`${platform==="universal"?"Poll":"Tracked"} link copied.`);
+    const ok=await copyText(url.toString());setNotice(ok?`${platform==="universal"?"Poll":"Tracked"} link copied.`:"Could not copy automatically. Press and hold the link to copy it.");
   };
   const update=async(id:string,status:string)=>{await fetch("/api/studio",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({id,status})});await load()};
   const saveEdit=async()=>{
@@ -76,7 +87,7 @@ function ShareLaunch({poll,close,copied,claim}:{poll:{publicToken:string;prompt:
   const [copyState,setCopyState]=useState("");
   const url=(platform="universal")=>{const target=new URL(`/p/${poll.publicToken}`,publicPollOrigin());if(platform!=="universal")target.searchParams.set("src",platform);return target.toString()};
   const message=(platform="universal")=>`${poll.prompt}\nPick your answer before you see the split: ${url(platform)}`;
-  const copy=async(platform="universal")=>{await navigator.clipboard.writeText(message(platform));setCopyState(platform);copied();window.setTimeout(()=>setCopyState(""),1800)};
+  const copy=async(platform="universal",caption=false)=>{const ok=await copyText(caption?message(platform):url(platform));setCopyState(ok?platform:"failed");if(ok)copied();window.setTimeout(()=>setCopyState(""),2200)};
   const open=(target:string)=>window.open(target,"_blank","noopener,noreferrer");
   const social=(platform:string)=>{
     const link=encodeURIComponent(url(platform));const text=encodeURIComponent(`${poll.prompt} Pick your answer before you see the split.`);
@@ -87,14 +98,14 @@ function ShareLaunch({poll,close,copied,claim}:{poll:{publicToken:string;prompt:
     else if(platform==="linkedin")open(`https://www.linkedin.com/sharing/share-offsite/?url=${link}`);
     else if(platform==="reddit")open(`https://www.reddit.com/submit?url=${link}&title=${encodeURIComponent(poll.prompt)}`);
     else if(platform==="email")window.open(`mailto:?subject=${encodeURIComponent("What do you think?")}&body=${encodeURIComponent(message("email"))}`,"_self");
-    else void copy(platform);
+    else void copy(platform,true);
   };
   const share=async()=>{
     const data={title:"Vote before you see the split",text:`${poll.prompt} Pick your answer before you see mine.`,url:url()};
     if(navigator.share)await navigator.share(data).catch(()=>undefined);else await copy();
   };
   const channels=[['sms','Message','◌'],['whatsapp','WhatsApp','W'],['facebook','Facebook','f'],['x','X','𝕏'],['linkedin','LinkedIn','in'],['reddit','Reddit','r'],['email','Email','@'],['instagram','Instagram','◎'],['tiktok','TikTok','♪']] as const;
-  return <div className="modal-backdrop share-launch-backdrop"><section className="share-launch"><span className="launch-check">✓</span><p>YOUR POLL IS LIVE</p><h2>Share your poll.</h2><p className="share-launch-question">{poll.prompt}</p><div className="share-channel-grid">{channels.map(([id,label,icon])=><button key={id} onClick={()=>social(id)}><i>{icon}</i><span>{copyState===id?"Copied":label}</span>{(id==="instagram"||id==="tiktok")&&<small>copies link</small>}</button>)}</div><button className="share-launch-primary" onClick={share}>More share options <span>↗</span></button><button className="share-launch-copy" onClick={()=>copy()}>{copyState==="universal"?"Copied":"Copy link & caption"}</button><small>Every platform link is tagged so results can show where responses came from.</small><button className="share-launch-claim" onClick={claim}>Claim this creator account</button><button className="share-launch-close" onClick={close}>Done</button></section></div>;
+  return <div className="modal-backdrop share-launch-backdrop"><section className="share-launch"><span className="launch-check">✓</span><p>YOUR POLL IS LIVE</p><h2>Share your poll.</h2><p className="share-launch-question">{poll.prompt}</p><div className="share-channel-grid">{channels.map(([id,label,icon])=><button key={id} onClick={()=>social(id)}><i>{icon}</i><span>{copyState===id?"Copied":label}</span>{(id==="instagram"||id==="tiktok")&&<small>copies caption</small>}</button>)}</div><button className="share-launch-primary" onClick={share}>More share options <span>↗</span></button><button className="share-launch-copy" onClick={()=>copy()}>{copyState==="universal"?"✓ Link copied":copyState==="failed"?"Copy failed — try again":"Copy link"}</button><small>Every platform link is tagged so results can show where responses came from.</small><button className="share-launch-claim" onClick={claim}>Claim this creator account</button><button className="share-launch-close" onClick={close}>Done</button></section></div>;
 }
 
 function Home({name,polls,total,create,results}:{name:string;polls:Poll[];total:number;create:()=>void;results:(id:string)=>void}){
