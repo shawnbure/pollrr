@@ -96,7 +96,7 @@ export async function POST(request:Request){
       return Response.json(result);
     }
     if(action==="review"){
-      const result=await generate(guard,`Review this proposed poll for leading wording, ambiguity, false binaries, emotional loading, and answer balance. Question: ${body?.prompt}. Choice A: ${body?.optionA}. Choice B: ${body?.optionB}.`,schema({
+      const result=await generate(guard,`Score this proposed poll from 0 to 100 for neutral, clear measurement. Use this rubric: 90-100 is neutral and publication-ready; 75-89 has only minor issues; 50-74 needs revision; 1-49 is substantially biased or unclear; 0 is reserved only for an unusable or overtly manipulative poll. Review leading wording, ambiguity, false binaries, emotional loading, and answer balance. Return short, specific issue labels only, and make the verdict consistent with the numeric score. Question: ${body?.prompt}. Choice A: ${body?.optionA}. Choice B: ${body?.optionB}.`,schema({
         score:{type:"integer",minimum:0,maximum:100},issues:{type:"array",items:{type:"string"},maxItems:5},
         neutralRewrite:{type:"string"},optionA:{type:"string"},optionB:{type:"string"},verdict:{type:"string"},
       },["score","issues","neutralRewrite","optionA","optionB","verdict"]));
