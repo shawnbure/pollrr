@@ -18,13 +18,13 @@ export default function CreatorClient({displayName,initialView="home"}:{displayN
   const [notice,setNotice]=useState("");
   const [editing,setEditing]=useState<Poll|null>(null);
   const [justCreated,setJustCreated]=useState<{publicToken:string;prompt:string}|null>(null);
-  const load=useCallback(async()=>{const r=await fetch("/api/creator",{cache:"no-store"});if(r.ok){const next=await r.json() as CreatorData;setData(next);setSelected(current=>current||next.polls[0]?.id||"")}},[]);
+  const load=useCallback(async()=>{const r=await fetch("/api/studio",{cache:"no-store"});if(r.ok){const next=await r.json() as CreatorData;setData(next);setSelected(current=>current||next.polls[0]?.id||"")}},[]);
   useEffect(()=>{const timer=window.setTimeout(()=>void load(),0);return()=>window.clearTimeout(timer)},[load]);
   const active=data.polls.find(p=>p.id===selected)||data.polls[0];
   const total=data.polls.reduce((sum,p)=>sum+Number(p.responses),0);
   const create=async()=>{
     setBusy(true);setNotice("");
-    const r=await fetch("/api/creator",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(form)});
+    const r=await fetch("/api/studio",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(form)});
     const result=await r.json() as {id?:string;publicToken?:string;url?:string;error?:string};
     setBusy(false);
     if(!r.ok)return setNotice(result.error||"Could not create that poll.");
@@ -37,27 +37,27 @@ export default function CreatorClient({displayName,initialView="home"}:{displayN
     const url=new URL(`/p/${publicToken}`,publicPollOrigin());if(platform!=="universal")url.searchParams.set("src",platform);
     await navigator.clipboard.writeText(url.toString());setNotice(`${platform==="universal"?"Poll":"Tracked"} link copied.`);
   };
-  const update=async(id:string,status:string)=>{await fetch("/api/creator",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({id,status})});await load()};
+  const update=async(id:string,status:string)=>{await fetch("/api/studio",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({id,status})});await load()};
   const saveEdit=async()=>{
     if(!editing)return;
     setBusy(true);
-    const r=await fetch("/api/creator",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({kind:"poll",...editing})});
+    const r=await fetch("/api/studio",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({kind:"poll",...editing})});
     const result=await r.json() as {error?:string};setBusy(false);
     if(!r.ok)return setNotice(result.error||"Could not update that poll.");
     setEditing(null);setNotice("Poll updated.");await load();
   };
   const removePoll=async(id:string)=>{
     if(!confirm("Delete this poll? Polls with responses will be closed so their immutable evidence remains available."))return;
-    const r=await fetch(`/api/creator?id=${encodeURIComponent(id)}`,{method:"DELETE"});
+    const r=await fetch(`/api/studio?id=${encodeURIComponent(id)}`,{method:"DELETE"});
     const result=await r.json() as {error?:string;archived?:boolean};
     if(!r.ok)return setNotice(result.error||"Could not delete that poll.");
     setNotice(result.archived?"Poll closed. Its immutable response record was preserved.":"Poll deleted.");await load();
   };
-  const nightly=async(value:boolean)=>{setData({...data,preferences:{...data.preferences,nightlyResults:value}});await fetch("/api/creator",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({kind:"preferences",nightlyResults:value})})};
-  const joinAiWaitlist=async()=>{await fetch("/api/creator",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({kind:"aiWaitlist"})});setData({...data,preferences:{...data.preferences,aiWaitlist:true}});setNotice("You’re on the Pollrr AI launch list.")};
+  const nightly=async(value:boolean)=>{setData({...data,preferences:{...data.preferences,nightlyResults:value}});await fetch("/api/studio",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({kind:"preferences",nightlyResults:value})})};
+  const joinAiWaitlist=async()=>{await fetch("/api/studio",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({kind:"aiWaitlist"})});setData({...data,preferences:{...data.preferences,aiWaitlist:true}});setNotice("You’re on the Pollrr AI launch list.")};
   const initials=displayName.split(/\s|@/).filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase();
   return <main className="creator-shell">
-    <header className="creator-top"><Link className="creator-logo" href="/admin"><span>p</span>pollrr</Link><nav>{(["home","create","polls","results","account"] as View[]).map(item=><button key={item} className={view===item?"active":""} onClick={()=>setView(item)}>{item==="polls"?"My polls":item}</button>)}{data.platform&&<Link href="/admin?mode=platform">Admin</Link>}</nav><button className="creator-avatar" onClick={()=>setView("account")}>{initials}</button></header>
+    <header className="creator-top"><Link className="creator-logo" href="/studio"><span>p</span>pollrr</Link><nav>{(["home","create","polls","results","account"] as View[]).map(item=><button key={item} className={view===item?"active":""} onClick={()=>setView(item)}>{item==="polls"?"My polls":item}</button>)}{data.platform&&<Link href="/admin?mode=platform">Admin</Link>}</nav><button className="creator-avatar" onClick={()=>setView("account")}>{initials}</button></header>
     {notice&&<div className="creator-toast">{notice}<button onClick={()=>setNotice("")}>×</button></div>}
     <section className="creator-content">
       {view==="home"&&<Home name={displayName} polls={data.polls} total={total} create={()=>setView("create")} results={(id)=>{setSelected(id);setView("results")}}/>}
@@ -86,7 +86,7 @@ function Home({name,polls,total,create,results}:{name:string;polls:Poll[];total:
 }
 function Create({form,setForm,create,busy,aiPlan,aiRemaining,onAiUsed,upgrade}:{form:{prompt:string;optionA:string;optionB:string;topic:string;tags:string;theme:string;isPublic:boolean};setForm:(v:typeof form)=>void;create:()=>void;busy:boolean;aiPlan:string;aiRemaining:number;onAiUsed:()=>Promise<void>;upgrade:()=>void}){
   const [idea,setIdea]=useState("");const [aiBusy,setAiBusy]=useState("");const [review,setReview]=useState<{score:number;issues:string[];neutralRewrite:string;optionA:string;optionB:string;verdict:string}|null>(null);const [ideas,setIdeas]=useState<string[]>([]);const [aiError,setAiError]=useState("");
-  const ai=async(action:string,payload:object={})=>{setAiBusy(action);setAiError("");const r=await fetch("/api/ai",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action,...payload})});const result=await r.json() as Record<string,unknown>&{error?:string};setAiBusy("");if(r.ok)await onAiUsed();if(!r.ok){setAiError(result.error||"AI could not complete that.");return null}return result};
+  const ai=async(action:string,payload:object={})=>{setAiBusy(action);setAiError("");const r=await fetch("/api/studio-ai",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action,...payload})});const result=await r.json() as Record<string,unknown>&{error?:string};setAiBusy("");if(r.ok)await onAiUsed();if(!r.ok){setAiError(result.error||"AI could not complete that.");return null}return result};
   const generate=async()=>{const r=await ai("create",{idea});if(r)setForm({...form,prompt:String(r.question||""),optionA:String(r.optionA||""),optionB:String(r.optionB||""),topic:String(r.topic||""),tags:Array.isArray(r.tags)?r.tags.join(", "):""})};
   const reviewPoll=async()=>{const r=await ai("review",{prompt:form.prompt,optionA:form.optionA,optionB:form.optionB});if(r)setReview(r as unknown as typeof review)};
   const getIdeas=async()=>{const r=await ai("ideas");if(r)setIdeas(Array.isArray(r.followUps)?r.followUps.map(String):[])};
@@ -103,7 +103,7 @@ function Polls({polls,copy,update,edit,remove,results,create}:{polls:Poll[];copy
 }
 function Results({polls,active,selected,select,copy,aiPlan,aiRemaining,onAiUsed,upgrade}:{polls:Poll[];active?:Poll;selected:string;select:(s:string)=>void;copy:(id:string,p?:string)=>void;aiPlan:string;aiRemaining:number;onAiUsed:()=>Promise<void>;upgrade:()=>void}){
   const [summary,setSummary]=useState<{headline:string;summary:string;insights:string[];explanationThemes:string[];facebook:string;instagram:string;tiktok:string}|null>(null);const [aiBusy,setAiBusy]=useState(false);const [aiError,setAiError]=useState("");
-  const summarize=async()=>{if(!active)return;setAiBusy(true);setAiError("");const r=await fetch("/api/ai",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"summary",questionId:active.id})});const result=await r.json() as typeof summary&{error?:string};setAiBusy(false);if(!r.ok)return setAiError(result?.error||"Could not summarize.");setSummary(result);await onAiUsed()};
+  const summarize=async()=>{if(!active)return;setAiBusy(true);setAiError("");const r=await fetch("/api/studio-ai",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"summary",questionId:active.id})});const result=await r.json() as typeof summary&{error?:string};setAiBusy(false);if(!r.ok)return setAiError(result?.error||"Could not summarize.");setSummary(result);await onAiUsed()};
   const pct=active?.responses?Math.round(Number(active.optionACount)/Number(active.responses)*100):0;const b=active?.responses?100-pct:0;
   const platforms=["facebook","instagram","youtube","tiktok","reddit","discord","slack"];
   if(!active)return <div className="creator-empty"><h2>Create a poll to see its results.</h2></div>;

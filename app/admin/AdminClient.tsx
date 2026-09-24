@@ -103,7 +103,7 @@ export default function AdminClient({ displayName }: { displayName:string }) {
       <div className="sidebar-bottom"><div className="admin-user"><span>{displayName.slice(0,2).toUpperCase()}</span><div><b>{displayName}</b><small>{manage?.platform?"Platform administrator":workspace?.organization.role||"Member"}</small></div></div></div>
     </aside>
     <section className="admin-main">
-      <header className="admin-header"><div><p>{manage?.platform?"POLLRR CONTROL ROOM":workspace?.organization.name?.toUpperCase()||"POLLRR"}</p><h1>{active}</h1></div><div className="header-actions">{manage?.platform&&<Link className="creator-view-link" href="/admin">Creator view</Link>}<button onClick={()=>window.open("/","_blank")}>Voter view</button><button className="new-btn" onClick={()=>openModal(primaryAction(active))}>＋ {primaryLabel(active)}</button></div></header>
+      <header className="admin-header"><div><p>{manage?.platform?"POLLRR CONTROL ROOM":workspace?.organization.name?.toUpperCase()||"POLLRR"}</p><h1>{active}</h1></div><div className="header-actions">{manage?.platform&&<Link className="creator-view-link" href="/studio">Creator view</Link>}<button onClick={()=>window.open("/","_blank")}>Voter view</button><button className="new-btn" onClick={()=>openModal(primaryAction(active))}>＋ {primaryLabel(active)}</button></div></header>
       {notice&&<div className="admin-notice">{notice}<button onClick={()=>setNotice("")}>×</button></div>}
 
       {active==="Overview"&&<>

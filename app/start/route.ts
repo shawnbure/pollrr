@@ -1,13 +1,13 @@
 const COOKIE_NAME = "pollrr_creator";
 
 function safeReturnTo(value: string | null) {
-  if (!value?.startsWith("/") || value.startsWith("//")) return "/admin?start=create";
+  if (!value?.startsWith("/") || value.startsWith("//")) return "/studio?start=create";
   try {
     const url = new URL(value, "https://app.pollrr.com");
-    if (url.origin !== "https://app.pollrr.com") return "/admin?start=create";
+    if (url.origin !== "https://app.pollrr.com") return "/studio?start=create";
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {
-    return "/admin?start=create";
+    return "/studio?start=create";
   }
 }
 

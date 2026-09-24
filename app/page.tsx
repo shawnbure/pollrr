@@ -266,7 +266,7 @@ export default function Home({ publicToken }: { publicToken?:string } = {}) {
         <Link className="brand" href="/" aria-label="Pollrr home">
           <span className="brand-mark">p</span><span>pollrr</span>
         </Link>
-        <div className="public-nav-actions"><span className="trust-note"><i /> Anonymous by design</span><Link className="create-poll-cta" href="/admin?start=create"><b>Create a poll</b><small>Free · about 15 seconds</small></Link></div>
+        <div className="public-nav-actions"><span className="trust-note"><i /> Anonymous by design</span><Link className="create-poll-cta" href="/studio?start=create"><b>Create a poll</b><small>Free · about 15 seconds</small></Link></div>
       </header>
 
       {!online && <div className="offline-bar">Offline · answers stay safely on this device</div>}
@@ -279,7 +279,7 @@ export default function Home({ publicToken }: { publicToken?:string } = {}) {
             <p className="eyebrow">FREE POLL CREATOR</p>
             <h1>Ask one question. Share one link.</h1>
             <p>Create a poll in seconds. No setup, no response limits.</p>
-            <Link className="empty-create-cta" href="/admin?start=create">Create a poll →</Link>
+            <Link className="empty-create-cta" href="/studio?start=create">Create a poll →</Link>
           </div>
         )}
 
@@ -358,7 +358,7 @@ export default function Home({ publicToken }: { publicToken?:string } = {}) {
 
       <footer className="public-footer">
         <span>Neutral wording · Aggregate results</span>
-        <nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/admin">Admin</a></nav>
+        <nav><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/studio">Create</a></nav>
       </footer>
     </main>
   );

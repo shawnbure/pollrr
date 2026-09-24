@@ -17,7 +17,7 @@ test("finished Pollrr experience replaces the disposable starter", async () => {
   assert.match(layout, /Pollrr/);
   assert.match(css, /common-ground/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
-  assert.deepEqual(await readdir(new URL("app/_sites-preview", root)), []);
+  assert.deepEqual(await readdir(new URL("app/_sites-preview", root)).catch(error => error.code === "ENOENT" ? [] : Promise.reject(error)), []);
 });
 
 test("build emits the voting, methodology, and verification routes", async () => {
@@ -50,6 +50,6 @@ test("creator entry has a standalone frictionless session route", async () => {
   ]);
   assert.match(auth, /pollrr_creator/);
   assert.match(route, /HttpOnly; Secure; SameSite=Lax/);
-  assert.match(route, /\/admin\?start=create/);
+  assert.match(route, /\/studio\?start=create/);
   assert.match(auth, /const SIGN_IN_PATH = "\/start"/);
 });

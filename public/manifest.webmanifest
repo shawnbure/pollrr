@@ -11,6 +11,6 @@
     { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ],
   "shortcuts": [
-    { "name": "Create a poll", "short_name": "Create", "url": "/admin?start=create" }
+    { "name": "Create a poll", "short_name": "Create", "url": "/studio?start=create" }
   ]
 }
