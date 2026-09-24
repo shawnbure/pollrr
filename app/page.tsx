@@ -32,6 +32,10 @@ function deviceKey() {
 }
 
 export default function Home({ publicToken }: { publicToken?:string } = {}) {
+  return publicToken ? <PollExperience publicToken={publicToken}/> : <Landing/>;
+}
+
+function PollExperience({ publicToken }: { publicToken:string }) {
   const [poll, setPoll] = useState<Poll | null>(null);
   const [totals, setTotals] = useState<Totals>({ total: 0, optionA: 0, optionB: 0 });
   const [choice, setChoice] = useState<Choice | null>(null);
@@ -362,4 +366,26 @@ export default function Home({ publicToken }: { publicToken?:string } = {}) {
       </footer>
     </main>
   );
+}
+
+function Landing() {
+  return <main className="landing-shell">
+    <header className="landing-nav">
+      <Link className="brand" href="/" aria-label="Pollrr home"><span className="brand-mark">p</span><span>pollrr</span></Link>
+      <Link className="landing-login" href="/login">My polls</Link>
+    </header>
+    <section className="landing-hero">
+      <p className="eyebrow">FREE · NO SIGN-UP TO START</p>
+      <h1>Ask one question.<br/>Share one link.</h1>
+      <p>Create a beautiful poll in seconds. Friends answer with one tap, then everyone sees the split.</p>
+      <Link className="landing-primary" href="/studio?start=create">Create a poll <span>→</span></Link>
+      <small>Your private creator account starts automatically.</small>
+    </section>
+    <section className="landing-steps" aria-label="How Pollrr works">
+      <article><span>1</span><b>Write your question</b><small>Two choices. Nothing complicated.</small></article>
+      <article><span>2</span><b>Share anywhere</b><small>Text, Instagram, TikTok, YouTube, or anywhere links work.</small></article>
+      <article><span>3</span><b>Watch the ripple</b><small>See answers, friend challenges, and a verifiable record.</small></article>
+    </section>
+    <footer className="landing-footer"><span>Human answers. Verifiable results.</span><nav><Link href="/methodology">Methodology</Link><Link href="/privacy">Privacy</Link></nav></footer>
+  </main>;
 }

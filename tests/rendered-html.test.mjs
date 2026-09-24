@@ -12,6 +12,8 @@ test("finished Pollrr experience replaces the disposable starter", async () => {
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
   assert.match(page, /Vote to reveal the live split/);
+  assert.match(page, /Ask one question/);
+  assert.match(page, /Create a poll/);
   assert.match(page, /Verify this result/);
   assert.match(page, /private-map/);
   assert.match(layout, /Pollrr/);
