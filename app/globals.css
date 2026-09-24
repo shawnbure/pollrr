@@ -756,6 +756,12 @@ button { touch-action: manipulation; }
 .login-shell h1 { margin:0; font-size:clamp(44px,9vw,68px); line-height:.97; letter-spacing:-.06em; }
 .login-shell section > p:not(.eyebrow) { margin:22px 0; color:var(--muted); font-size:17px; line-height:1.55; }
 .login-shell section > button { width:100%; min-height:58px; border:0; border-radius:16px; background:var(--purple); color:#fff; font-size:16px; font-weight:850; cursor:pointer; }
+.login-primary,.login-biometric { min-height:58px; display:grid; place-items:center; border-radius:16px; text-decoration:none; font-size:16px; font-weight:850; }
+.login-primary { background:var(--purple); color:#fff; }
+.login-biometric { margin-top:10px; background:#eef0ff; color:#3435a8; }
+.login-divider { display:flex; align-items:center; gap:11px; margin:24px 0 12px; color:#969bad; font-size:9px; font-weight:900; letter-spacing:.1em; }
+.login-divider::before,.login-divider::after { content:""; flex:1; height:1px; background:#e1e4ec; }
+.login-shell section > button.login-passkey { min-height:50px; background:#f1f2f6; color:#424757; }
 .login-new { display:block; margin-top:22px; color:#4947c7; text-align:center; text-decoration:none; font-weight:800; }
 .login-error { display:block; margin-top:12px; color:#b42318; }
 
