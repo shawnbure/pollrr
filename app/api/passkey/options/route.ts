@@ -8,11 +8,16 @@ function creatorId(value?: string) {
   return value && /^[a-f0-9-]{36}$/.test(value) ? value : null;
 }
 
+function relyingPartyId(hostname:string){
+  if(hostname==="pollrr.ai"||hostname==="app.pollrr.ai")return "pollrr.ai";
+  return hostname;
+}
+
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null) as { mode?:string;handle?:string } | null;
   const mode = body?.mode;
   const url = new URL(request.url);
-  const rpID = url.hostname;
+  const rpID = relyingPartyId(url.hostname);
   const origin = url.origin;
   const challengeId = crypto.randomUUID();
   const expiresAt = Date.now() + 5 * 60_000;
@@ -34,6 +39,7 @@ export async function POST(request: Request) {
       attestationType:"none",
       excludeCredentials:passkeys.results.map(item=>({id:item.id,transports:JSON.parse(item.transports)})),
       authenticatorSelection:{residentKey:"required",userVerification:"required"},
+      preferredAuthenticatorType:"localDevice",
       supportedAlgorithmIDs:[-7,-257],
     });
     await env.DB.prepare("INSERT INTO creator_auth_challenges (id,challenge,ceremony,account_id,handle,rp_id,origin,expires_at) VALUES (?,?,?,?,?,?,?,?)")
