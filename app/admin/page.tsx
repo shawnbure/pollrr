@@ -6,8 +6,8 @@ import { env } from "cloudflare:workers";
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage({searchParams}:{searchParams:Promise<{mode?:string;start?:string}>}) {
-  const user = await requireChatGPTUser("/admin");
   const query=await searchParams;
+  const user = await requireChatGPTUser(query.start==="create"?"/admin?start=create":"/admin");
   const invitation = await env.DB.prepare(
     "SELECT status FROM organization_members WHERE email=? LIMIT 1",
   ).bind(user.email).first<{ status: string }>();

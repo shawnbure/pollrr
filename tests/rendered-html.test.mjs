@@ -42,3 +42,13 @@ test("viral loop and installable PWA remain part of the product", async () => {
   assert.equal(JSON.parse(manifest).display, "standalone");
   assert.match(worker, /pollrr-shell/);
 });
+
+test("creator entry has a standalone frictionless session route", async () => {
+  const [auth, route] = await Promise.all([
+    readFile(new URL("../app/chatgpt-auth.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/signin-with-chatgpt/route.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(auth, /pollrr_creator/);
+  assert.match(route, /HttpOnly; Secure; SameSite=Lax/);
+  assert.match(route, /\/admin\?start=create/);
+});

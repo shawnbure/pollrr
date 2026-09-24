@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 export type ChatGPTUser = {
@@ -16,12 +17,21 @@ const PERCENT_ENCODED_UTF8 = "percent-encoded-utf-8";
 const SIGN_IN_PATH = "/signin-with-chatgpt";
 const SIGN_OUT_PATH = "/signout-with-chatgpt";
 const CALLBACK_PATH = "/callback";
+const GUEST_COOKIE = "pollrr_creator";
 
 export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
   const requestHeaders = await headers();
-  const email =
+  let email =
     requestHeaders.get(USER_EMAIL_HEADER) ??
     requestHeaders.get(CLOUDFLARE_USER_EMAIL_HEADER);
+  let guest = false;
+  if (!email) {
+    const guestId = (await cookies()).get(GUEST_COOKIE)?.value;
+    if (guestId && /^[a-f0-9-]{36}$/.test(guestId)) {
+      email = `guest-${guestId}@creator.pollrr`;
+      guest = true;
+    }
+  }
   if (!email) return null;
 
   const encodedFullName = requestHeaders.get(USER_FULL_NAME_HEADER);
@@ -32,7 +42,7 @@ export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
       : null;
 
   return {
-    displayName: fullName ?? email,
+    displayName: guest ? "Pollrr creator" : fullName ?? email,
     email,
     fullName,
   };
