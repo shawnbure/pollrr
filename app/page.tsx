@@ -15,8 +15,9 @@ type Poll = {
   organizationId?: string;
 };
 type Totals = { total: number; optionA: number; optionB: number };
+type Circle = Totals;
 type Reason = { id: string; label: string };
-type PendingVote = { questionId: string; choice: Choice; voterKey: string; rippleId: string; responseMs?: number; sourceToken?: string | null };
+type PendingVote = { questionId: string; choice: Choice; voterKey: string; rippleId: string; parentRippleId?: string | null; responseMs?: number; sourceToken?: string | null };
 
 const PENDING_KEY = "pollrr:pending-vote";
 const VOTER_KEY = "pollrr:voter-key";
@@ -49,17 +50,28 @@ export default function Home({ publicToken }: { publicToken?:string } = {}) {
   const [contactSaved, setContactSaved] = useState(false);
   const [contactMessage, setContactMessage] = useState("");
   const [answeredRipple, setAnsweredRipple] = useState("");
+  const [circle, setCircle] = useState<Circle>({ total: 0, optionA: 0, optionB: 0 });
+  const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
   const startedAt = useRef(0);
 
   const loadPoll = useCallback(async () => {
     try {
       const query = new URLSearchParams(location.search);
       if (publicToken) query.set("t", publicToken);
+      query.set("voterKey", deviceKey());
       const response = await fetch(`/api/poll?${query}`, { cache: "no-store" });
       if (!response.ok) throw new Error("No live poll");
-      const data = await response.json() as { poll: Poll; reasons: Reason[] };
+      const data = await response.json() as { poll: Poll; reasons: Reason[]; previousVote?: { choice:Choice;rippleId:string;totals:Totals;circle:Circle } | null };
       setPoll(data.poll);
       setReasons(data.reasons ?? []);
+      if (data.previousVote) {
+        setChoice(data.previousVote.choice);
+        setAnsweredRipple(data.previousVote.rippleId);
+        setTotals(data.previousVote.totals);
+        setCircle(data.previousVote.circle);
+        setStage("result");
+        return;
+      }
       startedAt.current = Date.now();
       setStage("vote");
     } catch {
@@ -109,6 +121,12 @@ export default function Home({ publicToken }: { publicToken?:string } = {}) {
       window.removeEventListener("offline", update);
     };
   }, [loadPoll]);
+
+  useEffect(() => {
+    const capture = (event: Event) => { event.preventDefault(); setInstallPrompt(event); };
+    window.addEventListener("beforeinstallprompt", capture);
+    return () => window.removeEventListener("beforeinstallprompt", capture);
+  }, []);
 
   useEffect(() => {
     if (!online) return;
@@ -203,8 +221,8 @@ export default function Home({ publicToken }: { publicToken?:string } = {}) {
     url.searchParams.set("r", crypto.randomUUID());
     if (answeredRipple) url.searchParams.set("parent", answeredRipple);
     const data = {
-      title: "What does your circle think?",
-      text: `${poll.prompt} Vote before you see the split.`,
+      title: "Think we agree?",
+      text: `${poll.prompt} Pick your answer before you see mine.`,
       url: url.toString(),
     };
     try {
@@ -217,6 +235,12 @@ export default function Home({ publicToken }: { publicToken?:string } = {}) {
     } catch {
       // Closing the native share sheet is a successful exit.
     }
+  };
+
+  const install = async () => {
+    if (!installPrompt) return;
+    await (installPrompt as Event & { prompt:()=>Promise<void> }).prompt();
+    setInstallPrompt(null);
   };
 
   const saveContact = async () => {
@@ -242,7 +266,7 @@ export default function Home({ publicToken }: { publicToken?:string } = {}) {
         <Link className="brand" href="/" aria-label="Pollrr home">
           <span className="brand-mark">p</span><span>pollrr</span>
         </Link>
-        <span className="trust-note"><i /> Anonymous by design</span>
+        <div className="public-nav-actions"><span className="trust-note"><i /> Anonymous by design</span><Link className="create-poll-cta" href="/admin?start=create"><b>Create a poll</b><small>Free · about 15 seconds</small></Link></div>
       </header>
 
       {!online && <div className="offline-bar">Offline · answers stay safely on this device</div>}
@@ -252,10 +276,10 @@ export default function Home({ publicToken }: { publicToken?:string } = {}) {
 
         {stage === "empty" && (
           <div className="empty-poll">
-            <p className="eyebrow">POLLRR</p>
-            <h1>The next question is coming.</h1>
-            <p>Check back soon. Good questions are worth getting right.</p>
-            <button onClick={loadPoll}>Check again</button>
+            <p className="eyebrow">FREE POLL CREATOR</p>
+            <h1>Ask one question. Share one link.</h1>
+            <p>Create a poll in seconds. No setup, no response limits.</p>
+            <Link className="empty-create-cta" href="/admin?start=create">Create a poll →</Link>
           </div>
         )}
 
@@ -300,8 +324,10 @@ export default function Home({ publicToken }: { publicToken?:string } = {}) {
               <span className="spark">✦</span>
               <div><b>{totals.total < 10 ? "The split gets better with every answer." : "This result updates live."}</b><small>Share it to see what your circle really thinks.</small></div>
             </div>
-            <button className="share-primary" onClick={share}><span>{copied ? "Link copied" : "Ask your circle"}</span><span className="share-icon">↗</span></button>
-            <p className="share-sub">They vote before seeing the result.</p>
+            <div className="circle-score"><span>{circle.total}</span><div><b>{circle.total === 1 ? "friend answered your challenge" : "friends answered your challenge"}</b><small>{circle.total ? "Come back anytime—the count updates automatically." : "Be the first to start a ripple."}</small></div></div>
+            <button className="share-primary" onClick={share}><span>{copied ? "Challenge copied" : "Challenge a friend"}</span><span className="share-icon">↗</span></button>
+            <p className="share-sub">One tap to share. They answer before seeing your result.</p>
+            {installPrompt && <button className="install-pwa" onClick={install}>Add Pollrr to your phone</button>}
             <div className="explain-box">
               <p className="eyebrow">OPTIONAL · WHY?</p>
               {explanationSaved ? <b>Thank you. Your explanation is counted separately from your vote.</b> : <>

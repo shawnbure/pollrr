@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Manrope } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
+import PwaRegister from "./pwa-register";
 
 const manrope = Manrope({
   variable: "--font-product-sans",
@@ -13,6 +14,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
+  themeColor: "#5b5cf0",
+};
+
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
   const host = requestHeaders.get("host") ?? "localhost:3000";
@@ -22,6 +31,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title: "Pollrr — Vote first. See the split.",
     description: "One question. One tap. See what your circle really thinks.",
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
+    manifest: "/manifest.webmanifest",
+    appleWebApp: { capable: true, statusBarStyle: "default", title: "Pollrr" },
     openGraph: {
       title: "Pollrr — Vote first. See the split.",
       description: "One question. One tap. See what your circle really thinks.",
@@ -46,6 +57,7 @@ export default function RootLayout({
       <body
         className={`${manrope.variable} ${geistMono.variable} antialiased`}
       >
+        <PwaRegister />
         {children}
       </body>
     </html>

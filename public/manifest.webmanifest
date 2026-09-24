@@ -1,0 +1,16 @@
+{
+  "name": "Pollrr — ask, answer, compare",
+  "short_name": "Pollrr",
+  "description": "One question. One tap. See what your circle thinks.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f8fc",
+  "theme_color": "#5b5cf0",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Create a poll", "short_name": "Create", "url": "/admin?start=create" }
+  ]
+}

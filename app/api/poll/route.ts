@@ -70,6 +70,20 @@ export async function GET(request: Request) {
   const reasons = await env.DB.prepare(
     "SELECT id, label FROM question_reasons WHERE question_id = ? ORDER BY sort_order",
   ).bind(poll.id).all<{ id: string; label: string }>();
+  const voterKey = url.searchParams.get("voterKey")?.slice(0, 80);
+  const previousVote = voterKey
+    ? await env.DB.prepare(
+      "SELECT choice,ripple_id rippleId FROM votes WHERE question_id=? AND voter_key=? LIMIT 1",
+    ).bind(poll.id, voterKey).first<{ choice: "a" | "b"; rippleId: string }>()
+    : null;
+  const circle = previousVote
+    ? await env.DB.prepare(
+      `SELECT COUNT(*) total,
+        SUM(CASE WHEN choice='a' THEN 1 ELSE 0 END) option_a,
+        SUM(CASE WHEN choice='b' THEN 1 ELSE 0 END) option_b
+       FROM votes WHERE question_id=? AND parent_ripple_id=?`,
+    ).bind(poll.id, previousVote.rippleId).first<{ total:number;option_a:number;option_b:number }>()
+    : null;
   return Response.json({
     poll: {
       id: poll.id,
@@ -82,6 +96,16 @@ export async function GET(request: Request) {
       organizationId: poll.organization_id,
     },
     reasons: reasons.results,
+    previousVote: previousVote ? {
+      choice: previousVote.choice,
+      rippleId: previousVote.rippleId,
+      totals: await totals(poll.id),
+      circle: {
+        total: Number(circle?.total ?? 0),
+        optionA: Number(circle?.option_a ?? 0),
+        optionB: Number(circle?.option_b ?? 0),
+      },
+    } : null,
     resultPolicy: "Results unlock only after a human answer is counted.",
   });
 }

@@ -5,7 +5,7 @@ import { env } from "cloudflare:workers";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminPage({searchParams}:{searchParams:Promise<{mode?:string}>}) {
+export default async function AdminPage({searchParams}:{searchParams:Promise<{mode?:string;start?:string}>}) {
   const user = await requireChatGPTUser("/admin");
   const query=await searchParams;
   const invitation = await env.DB.prepare(
@@ -17,5 +17,5 @@ export default async function AdminPage({searchParams}:{searchParams:Promise<{mo
   }
   const platform=Boolean(await env.DB.prepare("SELECT role FROM platform_admins WHERE email=?").bind(user.email).first());
   if(query.mode==="platform"&&platform)return <AdminClient displayName={user.displayName}/>;
-  return <CreatorClient displayName={user.email}/>;
+  return <CreatorClient displayName={user.email} initialView={query.start==="create"?"create":"home"}/>;
 }
