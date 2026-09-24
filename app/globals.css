@@ -273,6 +273,7 @@ button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visib
 .question-ai-actions.exhausted { padding:12px; border-radius:13px; background:#f2eee6; }
 .question-ai-actions.exhausted > span { margin:0 auto 0 0; }
 .ai-ideas.inline { margin:-8px 0 22px; }
+.history-ideas-label { margin:2px 0 12px; color:#8a867f; font-size:10px; font-weight:900; letter-spacing:.12em; }
 .ai-ideas.inline button { display:flex; justify-content:space-between; align-items:center; gap:14px; background:#f1eee8; color:#33343d; border:1px solid #e3ddd3; font-size:13px; }
 .ai-ideas.inline button:hover { background:#e8e4ff; border-color:#d8d4ff; }
 .ai-ideas.inline button span { color:#5a54d6; font-weight:900; }

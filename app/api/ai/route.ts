@@ -118,6 +118,7 @@ export async function POST(request:Request){
       const history=account.organizationId?await env.DB.prepare(
         "SELECT prompt,topic,tags FROM questions WHERE organization_id=? ORDER BY created_at DESC LIMIT 20",
       ).bind(account.organizationId).all():{results:[]};
+      if(history.results.length===0)return Response.json({followUps:[],themes:[],emptyHistory:true});
       const result=await generate(guard,`Based on this creator's poll history, suggest useful, non-duplicative follow-up polls and high-level themes. History: ${JSON.stringify(history.results)}`,schema({
         followUps:{type:"array",items:{type:"string"},minItems:3,maxItems:6},
         themes:{type:"array",items:{type:"string"},minItems:2,maxItems:6},
