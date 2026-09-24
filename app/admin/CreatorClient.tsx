@@ -73,13 +73,28 @@ export default function CreatorClient({displayName,initialView="home"}:{displayN
 }
 
 function ShareLaunch({poll,close,copied,claim}:{poll:{publicToken:string;prompt:string};close:()=>void;copied:()=>void;claim:()=>void}){
-  const url=()=>new URL(`/p/${poll.publicToken}`,publicPollOrigin()).toString();
-  const copy=async()=>{await navigator.clipboard.writeText(url());copied();};
+  const [copyState,setCopyState]=useState("");
+  const url=(platform="universal")=>{const target=new URL(`/p/${poll.publicToken}`,publicPollOrigin());if(platform!=="universal")target.searchParams.set("src",platform);return target.toString()};
+  const message=(platform="universal")=>`${poll.prompt}\nPick your answer before you see the split: ${url(platform)}`;
+  const copy=async(platform="universal")=>{await navigator.clipboard.writeText(message(platform));setCopyState(platform);copied();window.setTimeout(()=>setCopyState(""),1800)};
+  const open=(target:string)=>window.open(target,"_blank","noopener,noreferrer");
+  const social=(platform:string)=>{
+    const link=encodeURIComponent(url(platform));const text=encodeURIComponent(`${poll.prompt} Pick your answer before you see the split.`);
+    if(platform==="sms")window.open(`sms:?&body=${encodeURIComponent(message("sms"))}`,"_self");
+    else if(platform==="whatsapp")open(`https://wa.me/?text=${encodeURIComponent(message("whatsapp"))}`);
+    else if(platform==="facebook")open(`https://www.facebook.com/sharer/sharer.php?u=${link}`);
+    else if(platform==="x")open(`https://twitter.com/intent/tweet?text=${text}&url=${link}`);
+    else if(platform==="linkedin")open(`https://www.linkedin.com/sharing/share-offsite/?url=${link}`);
+    else if(platform==="reddit")open(`https://www.reddit.com/submit?url=${link}&title=${encodeURIComponent(poll.prompt)}`);
+    else if(platform==="email")window.open(`mailto:?subject=${encodeURIComponent("What do you think?")}&body=${encodeURIComponent(message("email"))}`,"_self");
+    else void copy(platform);
+  };
   const share=async()=>{
     const data={title:"Vote before you see the split",text:`${poll.prompt} Pick your answer before you see mine.`,url:url()};
     if(navigator.share)await navigator.share(data).catch(()=>undefined);else await copy();
   };
-  return <div className="modal-backdrop share-launch-backdrop"><section className="share-launch"><span className="launch-check">✓</span><p>YOUR POLL IS LIVE</p><h2>Now start the ripple.</h2><p className="share-launch-question">{poll.prompt}</p><button className="share-launch-primary" onClick={share}>Share now <span>↗</span></button><button className="share-launch-copy" onClick={copy}>Copy link</button><small>Friends answer before they see the result. No account required.</small><button className="share-launch-claim" onClick={claim}>Claim this creator account</button><button className="share-launch-close" onClick={close}>Done</button></section></div>;
+  const channels=[['sms','Message','◌'],['whatsapp','WhatsApp','W'],['facebook','Facebook','f'],['x','X','𝕏'],['linkedin','LinkedIn','in'],['reddit','Reddit','r'],['email','Email','@'],['instagram','Instagram','◎'],['tiktok','TikTok','♪']] as const;
+  return <div className="modal-backdrop share-launch-backdrop"><section className="share-launch"><span className="launch-check">✓</span><p>YOUR POLL IS LIVE</p><h2>Share your poll.</h2><p className="share-launch-question">{poll.prompt}</p><div className="share-channel-grid">{channels.map(([id,label,icon])=><button key={id} onClick={()=>social(id)}><i>{icon}</i><span>{copyState===id?"Copied":label}</span>{(id==="instagram"||id==="tiktok")&&<small>copies link</small>}</button>)}</div><button className="share-launch-primary" onClick={share}>More share options <span>↗</span></button><button className="share-launch-copy" onClick={()=>copy()}>{copyState==="universal"?"Copied":"Copy link & caption"}</button><small>Every platform link is tagged so results can show where responses came from.</small><button className="share-launch-claim" onClick={claim}>Claim this creator account</button><button className="share-launch-close" onClick={close}>Done</button></section></div>;
 }
 
 function Home({name,polls,total,create,results}:{name:string;polls:Poll[];total:number;create:()=>void;results:(id:string)=>void}){

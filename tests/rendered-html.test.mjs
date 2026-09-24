@@ -39,7 +39,9 @@ test("viral loop and installable PWA remain part of the product", async () => {
   ]);
   assert.match(page, /Challenge a friend/);
   assert.match(page, /friends answered your challenge/);
-  assert.match(creator, /Now start the ripple/);
+  assert.match(creator, /Share your poll/);
+  assert.match(creator, /WhatsApp/);
+  assert.match(creator, /Instagram/);
   assert.match(layout, /manifest\.webmanifest/);
   assert.equal(JSON.parse(manifest).display, "standalone");
   assert.match(worker, /pollrr-shell/);

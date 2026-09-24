@@ -185,7 +185,9 @@ export async function POST(request: Request) {
       "SELECT id,organization_id,channel FROM distribution_links WHERE token=? AND question_id=?",
     ).bind(body.sourceToken, body.questionId).first<{ id: string; organization_id: string; channel: string }>()
     : null;
-  const sourceClass = distribution ? `channel:${distribution.channel}` : body.parentRippleId || body.rippleId ? "referred" : "direct";
+  const directChannel = body.sourceToken && ["sms","whatsapp","facebook","x","linkedin","reddit","email","instagram","tiktok","youtube","discord","slack"].includes(body.sourceToken)
+    ? body.sourceToken : null;
+  const sourceClass = distribution ? `channel:${distribution.channel}` : directChannel ? `channel:${directChannel}` : body.parentRippleId || body.rippleId ? "referred" : "direct";
   const eventId = crypto.randomUUID();
   const payloadHash = await sha256(JSON.stringify({
     eventId, voteId: id, questionId: body.questionId, choice: body.choice,
