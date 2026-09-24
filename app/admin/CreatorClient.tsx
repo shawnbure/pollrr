@@ -8,7 +8,7 @@ type Poll={id:string;publicToken:string;prompt:string;optionA:string;optionB:str
 type CreatorData={polls:Poll[];preferences:{nightlyResults:boolean;aiPlan:string;aiLimit:number;aiRemaining:number;aiWaitlist:boolean};platform:boolean};
 type View="home"|"create"|"polls"|"results"|"account";
 
-const publicPollOrigin=()=>location.hostname==="app.pollrr.com"?"https://pollrr.com":location.origin;
+const publicPollOrigin=()=>["app.pollrr.com","pollrr.ai"].includes(location.hostname)?"https://pollrr.ai":location.origin;
 
 async function copyText(text:string){
   try{

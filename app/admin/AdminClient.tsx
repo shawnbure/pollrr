@@ -23,7 +23,7 @@ type Overview = { totalResponses:number;integrity?:{total:number;trusted:number;
 type Modal = "campaign"|"poll"|"audience"|"link"|"member"|"organization"|"report"|"import"|null;
 
 const baseSections = ["Overview","Polls","Intelligence","Integrity","Team"];
-const publicPollOrigin=()=>location.hostname==="app.pollrr.com"?"https://pollrr.com":location.origin;
+const publicPollOrigin=()=>["app.pollrr.com","pollrr.ai"].includes(location.hostname)?"https://pollrr.ai":location.origin;
 
 export default function AdminClient({ displayName }: { displayName:string }) {
   const [active,setActive]=useState("Overview");

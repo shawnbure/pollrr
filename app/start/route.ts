@@ -3,8 +3,8 @@ const COOKIE_NAME = "pollrr_creator";
 function safeReturnTo(value: string | null) {
   if (!value?.startsWith("/") || value.startsWith("//")) return "/studio?start=create";
   try {
-    const url = new URL(value, "https://app.pollrr.com");
-    if (url.origin !== "https://app.pollrr.com") return "/studio?start=create";
+    const url = new URL(value, "https://pollrr.ai");
+    if (url.origin !== "https://pollrr.ai") return "/studio?start=create";
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {
     return "/studio?start=create";
