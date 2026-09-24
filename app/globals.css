@@ -747,7 +747,8 @@ button { touch-action: manipulation; }
 .passkey-panel { background:linear-gradient(145deg,#22243a,#121827)!important; color:#fff; }
 .passkey-panel > span { color:var(--acid)!important; }
 .passkey-panel p { color:#c6cbd6!important; }
-.passkey-panel input { width:100%; min-height:52px; margin-top:10px; border:1px solid #4b5368; border-radius:14px; background:#fff; padding:0 15px; font-size:16px; }
+.passkey-panel input { width:100%; min-height:52px; margin-top:10px; border:1px solid #4b5368; border-radius:14px; background:#fff; color:#151721; caret-color:#151721; -webkit-text-fill-color:#151721; padding:0 15px; font-size:16px; }
+.passkey-panel input::placeholder { color:#7a8190; -webkit-text-fill-color:#7a8190; opacity:1; }
 .passkey-panel button { margin-top:10px; min-height:50px; border:0; border-radius:14px; background:var(--acid); color:var(--navy); padding:0 18px; font-weight:850; cursor:pointer; }
 .passkey-panel small { display:block; margin-top:8px; color:#ffb4aa; }
 .login-shell { min-height:100dvh; display:grid; place-items:center; padding:24px; background:radial-gradient(circle at 85% 10%,rgba(91,92,240,.16),transparent 28rem),#f8f9fc; }
