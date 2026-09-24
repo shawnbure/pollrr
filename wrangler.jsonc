@@ -23,6 +23,7 @@
       },
       "routes": [
         { "pattern": "pollrr.ai", "custom_domain": true },
+        { "pattern": "app.pollrr.ai", "custom_domain": true },
         { "pattern": "app.pollrr.com", "custom_domain": true }
       ],
       "d1_databases": [
@@ -42,6 +43,7 @@
         "LEDGER_PUBLIC_KEY": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAER9QNpnluBp4Dq6bcxrlOTOBfH0LylGCwMuNVFhpqdDhZDgqQHz+HxOej5xYCTq1Q30b4t4tnHsH+nMBAvSbS0A=="
       },
       "routes": [
+        { "pattern": "dev.pollrr.ai", "custom_domain": true },
         { "pattern": "dev.pollrr.com", "custom_domain": true }
       ],
       "d1_databases": [
