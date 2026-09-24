@@ -33,8 +33,13 @@ async function access(){
   };
 }
 
-async function consumeCredit(account:NonNullable<Awaited<ReturnType<typeof access>>>){
+async function consumeCredit(account:NonNullable<Awaited<ReturnType<typeof access>>>,draftId:string){
   if(account.unlimited)return true;
+  if(!draftId)return false;
+  const existing=await env.DB.prepare(
+    "SELECT draft_id FROM creator_ai_poll_drafts WHERE email=? AND period=? AND draft_id=?",
+  ).bind(account.email,account.period,draftId).first();
+  if(existing)return true;
   const result=await env.DB.prepare(
     `INSERT INTO creator_ai_usage (email,period,actions,updated_at)
      VALUES (?,?,1,?)
@@ -44,7 +49,11 @@ async function consumeCredit(account:NonNullable<Awaited<ReturnType<typeof acces
      WHERE creator_ai_usage.actions<?
      RETURNING actions`,
   ).bind(account.email,account.period,Date.now(),FREE_ACTIONS_PER_MONTH).first<{actions:number}>();
-  return Boolean(result);
+  if(!result)return false;
+  await env.DB.prepare(
+    "INSERT OR IGNORE INTO creator_ai_poll_drafts (email,period,draft_id,created_at) VALUES (?,?,?,?)",
+  ).bind(account.email,account.period,draftId,Date.now()).run();
+  return true;
 }
 
 async function refundCredit(account:NonNullable<Awaited<ReturnType<typeof access>>>){
@@ -71,13 +80,15 @@ export async function POST(request:Request){
   if(!account)return Response.json({error:"Unauthorized"},{status:401});
   const body=await request.json().catch(()=>null) as Record<string,unknown>|null;
   const action=String(body?.action||"");
+  const draftId=String(body?.draftId||"").slice(0,100);
   const guard="You are Pollrr AI, a careful polling editor. Never invent responses. Avoid persuasion, partisan targeting, loaded framing, and false claims. Return only the requested JSON.";
   if(!["create","review","ideas","summary"].includes(action)){
     return Response.json({error:"Unsupported AI action."},{status:400});
   }
-  if(!await consumeCredit(account)){
+  const isPollDraftAction=action==="create"||action==="review";
+  if(isPollDraftAction&&!await consumeCredit(account,draftId)){
     return Response.json({
-      error:`You used all ${FREE_ACTIONS_PER_MONTH} free AI actions for ${account.period}. Join the AI launch list for paid access.`,
+      error:draftId?`You used all ${FREE_ACTIONS_PER_MONTH} free AI-assisted polls for ${account.period}. Join the AI launch list for paid access.`:"Refresh the page to start a new AI poll draft.",
       upgradeRequired:true,
       remaining:0,
     },{status:402});
@@ -87,6 +98,7 @@ export async function POST(request:Request){
       const idea=String(body?.idea||"").trim().slice(0,800);
       if(idea.length<3){
         await refundCredit(account);
+        await env.DB.prepare("DELETE FROM creator_ai_poll_drafts WHERE email=? AND period=? AND draft_id=?").bind(account.email,account.period,draftId).run();
         return Response.json({error:"Describe what you want to ask."},{status:400});
       }
       const result=await generate(guard,`Turn this idea into one clear, neutral, fast poll with two distinct choices: ${idea}`,schema({
@@ -122,7 +134,6 @@ export async function POST(request:Request){
          WHERE q.id=? AND q.organization_id=? GROUP BY q.id`,
       ).bind(questionId,account.organizationId).first();
       if(!poll){
-        await refundCredit(account);
         return Response.json({error:"Poll not found."},{status:404});
       }
       const reasons=await env.DB.prepare(
@@ -138,7 +149,10 @@ export async function POST(request:Request){
       return Response.json(result);
     }
   }catch(error){
-    await refundCredit(account);
+    if(isPollDraftAction){
+      await refundCredit(account);
+      await env.DB.prepare("DELETE FROM creator_ai_poll_drafts WHERE email=? AND period=? AND draft_id=?").bind(account.email,account.period,draftId).run();
+    }
     return Response.json({error:error instanceof Error?error.message:"AI request failed."},{status:502});
   }
 }
