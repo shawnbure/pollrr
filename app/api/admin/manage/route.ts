@@ -43,7 +43,7 @@ export async function GET(request: Request) {
   const requestedOrg = url.searchParams.get("organizationId");
   const organizationId = member.platform_role && requestedOrg ? requestedOrg : member.organization_id;
   if (!organizationId && member.platform_role) {
-    const [organizations,platformPolls] = await Promise.all([env.DB.prepare(
+    const [organizations,platformPolls,channels,daily] = await Promise.all([env.DB.prepare(
       `SELECT o.*,
         (SELECT COUNT(*) FROM organization_members m WHERE m.organization_id=o.id) members,
         (SELECT COUNT(*) FROM campaigns c WHERE c.organization_id=o.id) campaigns,
@@ -55,8 +55,20 @@ export async function GET(request: Request) {
        FROM questions q JOIN organizations o ON o.id=q.organization_id
        LEFT JOIN votes v ON v.question_id=q.id
        GROUP BY q.id ORDER BY q.created_at DESC`,
+    ).all(),env.DB.prepare(
+      `SELECT channel,COUNT(*) links,COALESCE(SUM(clicks),0) opens,COALESCE(SUM(responses),0) responses
+       FROM distribution_links GROUP BY channel ORDER BY responses DESC`,
+    ).all(),env.DB.prepare(
+      `SELECT date(v.created_at/1000,'unixepoch') day,COUNT(*) responses,
+        SUM(CASE WHEN ve.integrity_status='trusted' THEN 1 ELSE 0 END) trusted
+       FROM votes v LEFT JOIN vote_events ve ON ve.vote_id=v.id
+       GROUP BY day ORDER BY day DESC LIMIT 30`,
     ).all()]);
-    return Response.json({ platform:true,organizations:organizations.results,platformPolls:platformPolls.results });
+    return Response.json({
+      platform:true,organizationId:null,organizations:organizations.results,platformPolls:platformPolls.results,
+      team:[],reports:[],integrations:[],imports:[],audienceMetrics:[],audits:[],
+      analytics:{channels:channels.results,daily:daily.results},
+    });
   }
   const [team, reports, integrations, imports, audienceMetrics, channels, daily, audits, organizations, platformPolls] = await Promise.all([
     env.DB.prepare("SELECT email,role,status,title,created_at FROM organization_members WHERE organization_id=? ORDER BY created_at").bind(organizationId).all(),

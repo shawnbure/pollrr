@@ -1,4 +1,5 @@
-const COOKIE_NAME = "pollrr_creator";
+import { creatorCookie } from "../lib/creator-cookie";
+
 
 function safeReturnTo(value: string | null) {
   if (!value?.startsWith("/") || value.startsWith("//")) return "/studio?start=create";
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
     status: 303,
     headers: {
       location: destination.toString(),
-      "set-cookie": `${COOKIE_NAME}=${crypto.randomUUID()}; Path=/; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax`,
+      "set-cookie": await creatorCookie(crypto.randomUUID()),
     },
   });
 }

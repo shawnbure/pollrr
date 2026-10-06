@@ -1,12 +1,11 @@
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
 import { createPublicToken } from "../../lib/public-token";
+import { planFor } from "../../lib/plans";
 
 export const dynamic = "force-dynamic";
 
 type CreatorContext = { email:string; organizationId:string; platform:boolean };
-const FREE_AI_ACTIONS=10;
-
 function aiUsagePeriod(){
   return new Date().toISOString().slice(0,7);
 }
@@ -52,10 +51,10 @@ export async function GET() {
   if (!context) return Response.json({ error:"Unauthorized" },{ status:401 });
   if (!context.organizationId) return Response.json({
     polls:[],
-    preferences:{nightlyResults:false,aiPlan:"free",aiLimit:FREE_AI_ACTIONS,aiRemaining:FREE_AI_ACTIONS,aiWaitlist:false},
+    preferences:{nightlyResults:false,aiPlan:"free",aiLimit:100,aiDailyLimit:10,aiRemaining:100,aiWaitlist:false,membershipStatus:"active"},
     platform:context.platform,
   });
-  const [polls,preferences,aiUsage] = await Promise.all([
+  const [polls,preferences,aiUsage,membership] = await Promise.all([
     env.DB.prepare(
       `SELECT q.id,q.public_token publicToken,q.prompt,q.option_a optionA,q.option_b optionB,q.topic,q.tags,q.region,q.status,
         q.theme,q.is_public isPublic,q.created_at createdAt,
@@ -71,17 +70,22 @@ export async function GET() {
       .bind(context.email).first<{ nightly_results:number;ai_plan:string;ai_waitlist:number }>(),
     env.DB.prepare("SELECT actions FROM creator_ai_usage WHERE email=? AND period=?")
       .bind(context.email,aiUsagePeriod()).first<{ actions:number }>(),
+    env.DB.prepare("SELECT plan_id,status,requested_plan_id FROM creator_memberships WHERE email=?")
+      .bind(context.email).first<{plan_id:string;status:string;requested_plan_id:string|null}>(),
   ]);
-  const aiPlan=context.platform?"pro":preferences?.ai_plan||"free";
-  const aiLimit=context.platform||aiPlan==="pro"?-1:FREE_AI_ACTIONS;
+  const selectedPlan=context.platform?planFor("intelligence"):planFor(membership?.status==="active"?membership.plan_id:preferences?.ai_plan||"free");
+  const aiLimit=selectedPlan.aiMonthly;
   return Response.json({
     polls:polls.results,
     preferences:{
       nightlyResults:Boolean(preferences?.nightly_results),
-      aiPlan,
+      aiPlan:selectedPlan.id,
       aiLimit,
+      aiDailyLimit:selectedPlan.aiDaily,
       aiRemaining:aiLimit<0?-1:Math.max(0,aiLimit-Number(aiUsage?.actions||0)),
       aiWaitlist:Boolean(preferences?.ai_waitlist),
+      membershipStatus:membership?.status||"active",
+      requestedPlan:membership?.requested_plan_id||null,
     },
     platform:context.platform,
   });

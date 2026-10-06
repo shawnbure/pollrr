@@ -1,12 +1,9 @@
+import { verifyCreatorId } from "../../../lib/creator-cookie";
 import { env } from "cloudflare:workers";
 import { cookies } from "next/headers";
 import { generateAuthenticationOptions, generateRegistrationOptions } from "@simplewebauthn/server";
 
 export const dynamic = "force-dynamic";
-
-function creatorId(value?: string) {
-  return value && /^[a-f0-9-]{36}$/.test(value) ? value : null;
-}
 
 function relyingPartyId(hostname:string){
   if(hostname==="pollrr.ai"||hostname==="app.pollrr.ai")return "pollrr.ai";
@@ -23,7 +20,7 @@ export async function POST(request: Request) {
   const expiresAt = Date.now() + 5 * 60_000;
 
   if (mode === "register") {
-    const accountId = creatorId((await cookies()).get("pollrr_creator")?.value);
+    const accountId = await verifyCreatorId((await cookies()).get("pollrr_creator")?.value);
     if (!accountId) return Response.json({ error:"Start a creator account first." }, { status:401 });
     const handle = String(body?.handle || "").trim().toLowerCase().replace(/[^a-z0-9._-]/g, "").slice(0, 30);
     if (handle.length < 3) return Response.json({ error:"Choose a handle with at least 3 characters." }, { status:400 });

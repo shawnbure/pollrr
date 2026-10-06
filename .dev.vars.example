@@ -1,0 +1,4 @@
+CREATOR_SESSION_SECRET=
+# Optional encrypted contact storage. Generate a new random secret.
+CONTACT_VAULT_KEY=
+# Optional signing and billing keys are described in README.md.

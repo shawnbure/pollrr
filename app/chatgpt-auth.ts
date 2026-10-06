@@ -1,3 +1,4 @@
+import { verifyCreatorId } from "./lib/creator-cookie";
 import { headers } from "next/headers";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -8,8 +9,6 @@ export type ChatGPTUser = {
   fullName: string | null;
 };
 
-const USER_EMAIL_HEADER = "oai-authenticated-user-email";
-const CLOUDFLARE_USER_EMAIL_HEADER = "cf-access-authenticated-user-email";
 const USER_FULL_NAME_HEADER = "oai-authenticated-user-full-name";
 const USER_FULL_NAME_ENCODING_HEADER =
   "oai-authenticated-user-full-name-encoding";
@@ -21,12 +20,10 @@ const GUEST_COOKIE = "pollrr_creator";
 
 export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
   const requestHeaders = await headers();
-  let email =
-    requestHeaders.get(USER_EMAIL_HEADER) ??
-    requestHeaders.get(CLOUDFLARE_USER_EMAIL_HEADER);
+  let email: string | null = null;
   let guest = false;
   if (!email) {
-    const guestId = (await cookies()).get(GUEST_COOKIE)?.value;
+    const guestId = await verifyCreatorId((await cookies()).get(GUEST_COOKIE)?.value);
     if (guestId && /^[a-f0-9-]{36}$/.test(guestId)) {
       email = `guest-${guestId}@creator.pollrr`;
       guest = true;

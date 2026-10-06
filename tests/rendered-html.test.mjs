@@ -53,7 +53,8 @@ test("creator entry has a standalone frictionless session route", async () => {
     readFile(new URL("../app/start/route.ts", import.meta.url), "utf8"),
   ]);
   assert.match(auth, /pollrr_creator/);
-  assert.match(route, /HttpOnly; Secure; SameSite=Lax/);
+  assert.match(route, /await creatorCookie/);
+  assert.match(await readFile(new URL("../app/lib/creator-cookie.ts", import.meta.url), "utf8"), /HttpOnly; Secure; SameSite=Lax/);
   assert.match(route, /\/studio\?start=create/);
   assert.match(auth, /const SIGN_IN_PATH = "\/start"/);
 });

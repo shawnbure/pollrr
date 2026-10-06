@@ -81,12 +81,36 @@ test("Pollrr AI upgrade tools are implemented and entitlement protected", async 
   assert.match(ai, /upgradeRequired:true/);
   assert.match(ai, /Never invent responses/);
   const creator = await read("app/admin/CreatorClient.tsx");
-  assert.match(creator, /Create poll with AI/);
+  assert.match(creator, /Build with AI/);
   assert.match(creator, /Review neutrality with AI/);
   assert.match(creator, /Ideas from my history/);
   assert.match(creator, /Generate AI report/);
   const wrangler = await read("wrangler.jsonc");
   assert.match(wrangler, /"binding": "AI"/);
+});
+
+test("membership plans meter complete AI drafts and remain billing-provider ready", async () => {
+  const [plans, billing, ai, migration, creator] = await Promise.all([
+    read("app/lib/plans.ts"),
+    read("app/api/billing/route.ts"),
+    read("app/api/ai/route.ts"),
+    read("drizzle/0014_memberships_billing.sql"),
+    read("app/admin/CreatorClient.tsx"),
+  ]);
+  assert.match(plans, /aiDaily: 10/);
+  assert.match(plans, /aiMonthly: 100/);
+  assert.match(plans, /aiMonthly: 300/);
+  assert.match(billing, /activeStripeConfig/);
+  assert.match(await read("app/lib/billing-config.ts"), /STRIPE_TEST_PRICE_PRO/);
+  assert.match(billing, /setupRequired:true/);
+  assert.match(ai, /creator_ai_poll_drafts/);
+  assert.match(ai, /creator_ai_daily_usage/);
+  assert.match(migration, /creator_memberships/);
+  assert.match(creator, /Checkout is being connected/);
+  assert.match(creator, /one credit/i);
+  const webhook = await read("app/api/billing/webhook/route.ts");
+  assert.match(webhook, /stripe-signature/);
+  assert.match(webhook, /checkout\.session\.completed/);
 });
 
 test("super-user poll library supports creator, topic, tag search and sorting", async () => {

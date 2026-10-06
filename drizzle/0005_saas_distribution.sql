@@ -107,5 +107,4 @@ CREATE TABLE `audit_log` (
   `created_at` integer NOT NULL
 );
 CREATE INDEX `audit_log_org_idx` ON `audit_log` (`organization_id`,`created_at`);
-INSERT INTO `platform_admins` (`email`,`role`,`created_at`)
-VALUES ('smb@workrr.ai','super_admin',1785283200000);
+

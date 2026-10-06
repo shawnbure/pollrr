@@ -48,8 +48,7 @@ ALTER TABLE `questions` ADD `campaign_id` text REFERENCES `campaigns`(`id`);
 
 INSERT INTO `organizations` (`id`,`name`,`slug`,`created_at`) VALUES
   ('org-pollrr','Pollrr Research','pollrr-research',1785283200000);
-INSERT INTO `organization_members` (`organization_id`,`email`,`role`,`created_at`) VALUES
-  ('org-pollrr','smb@workrr.ai','owner',1785283200000);
+
 INSERT INTO `campaigns` (`id`,`organization_id`,`name`,`objective`,`status`,`created_at`) VALUES
   ('campaign-launch','org-pollrr','Arizona Housing Pulse','Understand tradeoffs between housing supply, affordability, and neighborhood change.','active',1785283200000);
 INSERT INTO `audiences` (`id`,`organization_id`,`name`,`description`,`geography`,`created_at`) VALUES

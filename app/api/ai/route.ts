@@ -1,35 +1,43 @@
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "../../chatgpt-auth";
+import { planFor } from "../../lib/plans";
 
 export const dynamic="force-dynamic";
 
 type AiBinding={run:(model:string,input:object)=>Promise<unknown>};
 type AiResponse={response?:unknown};
 const MODEL="@cf/meta/llama-3.1-8b-instruct-fast";
-const FREE_ACTIONS_PER_MONTH=10;
-
 function usagePeriod(){
   return new Date().toISOString().slice(0,7);
+}
+
+function usageDay(){
+  return new Date().toISOString().slice(0,10);
 }
 
 async function access(){
   const user=await getChatGPTUser();
   if(!user)return null;
   const period=usagePeriod();
-  const [platform,preference,membership,usage]=await Promise.all([
+  const [platform,preference,membership,subscription,usage,dailyUsage]=await Promise.all([
     env.DB.prepare("SELECT role FROM platform_admins WHERE email=?").bind(user.email).first(),
     env.DB.prepare("SELECT ai_plan FROM creator_preferences WHERE email=?").bind(user.email).first<{ai_plan:string}>(),
     env.DB.prepare("SELECT organization_id FROM organization_members WHERE email=? AND status='active' ORDER BY created_at LIMIT 1").bind(user.email).first<{organization_id:string}>(),
+    env.DB.prepare("SELECT plan_id,status FROM creator_memberships WHERE email=?").bind(user.email).first<{plan_id:string;status:string}>(),
     env.DB.prepare("SELECT actions FROM creator_ai_usage WHERE email=? AND period=?").bind(user.email,period).first<{actions:number}>(),
+    env.DB.prepare("SELECT actions FROM creator_ai_daily_usage WHERE email=? AND day=?").bind(user.email,usageDay()).first<{actions:number}>(),
   ]);
-  const plan=preference?.ai_plan||"free";
+  const plan=platform?planFor("intelligence"):planFor(subscription?.status==="active"?subscription.plan_id:preference?.ai_plan||"free");
   return {
     email:user.email,
     organizationId:membership?.organization_id||"",
     period,
-    plan,
-    unlimited:Boolean(platform)||plan==="pro",
+    plan:plan.id,
+    monthlyLimit:plan.aiMonthly,
+    dailyLimit:plan.aiDaily,
+    unlimited:plan.aiMonthly<0,
     used:Number(usage?.actions||0),
+    dailyUsed:Number(dailyUsage?.actions||0),
   };
 }
 
@@ -40,6 +48,7 @@ async function consumeCredit(account:NonNullable<Awaited<ReturnType<typeof acces
     "SELECT draft_id FROM creator_ai_poll_drafts WHERE email=? AND period=? AND draft_id=?",
   ).bind(account.email,account.period,draftId).first();
   if(existing)return true;
+  if(account.dailyUsed>=account.dailyLimit||account.used>=account.monthlyLimit)return false;
   const result=await env.DB.prepare(
     `INSERT INTO creator_ai_usage (email,period,actions,updated_at)
      VALUES (?,?,1,?)
@@ -48,11 +57,17 @@ async function consumeCredit(account:NonNullable<Awaited<ReturnType<typeof acces
        updated_at=excluded.updated_at
      WHERE creator_ai_usage.actions<?
      RETURNING actions`,
-  ).bind(account.email,account.period,Date.now(),FREE_ACTIONS_PER_MONTH).first<{actions:number}>();
+  ).bind(account.email,account.period,Date.now(),account.monthlyLimit).first<{actions:number}>();
   if(!result)return false;
-  await env.DB.prepare(
-    "INSERT OR IGNORE INTO creator_ai_poll_drafts (email,period,draft_id,created_at) VALUES (?,?,?,?)",
-  ).bind(account.email,account.period,draftId,Date.now()).run();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO creator_ai_daily_usage (email,day,actions,updated_at) VALUES (?,?,1,?)
+       ON CONFLICT(email,day) DO UPDATE SET actions=creator_ai_daily_usage.actions+1,updated_at=excluded.updated_at`,
+    ).bind(account.email,usageDay(),Date.now()),
+    env.DB.prepare(
+      "INSERT OR IGNORE INTO creator_ai_poll_drafts (email,period,draft_id,created_at) VALUES (?,?,?,?)",
+    ).bind(account.email,account.period,draftId,Date.now()),
+  ]);
   return true;
 }
 
@@ -61,6 +76,9 @@ async function refundCredit(account:NonNullable<Awaited<ReturnType<typeof access
   await env.DB.prepare(
     "UPDATE creator_ai_usage SET actions=MAX(0,actions-1),updated_at=? WHERE email=? AND period=?",
   ).bind(Date.now(),account.email,account.period).run();
+  await env.DB.prepare(
+    "UPDATE creator_ai_daily_usage SET actions=MAX(0,actions-1),updated_at=? WHERE email=? AND day=?",
+  ).bind(Date.now(),account.email,usageDay()).run();
 }
 
 function schema(properties:Record<string,object>,required:string[]){
@@ -85,10 +103,13 @@ export async function POST(request:Request){
   if(!["create","review","ideas","summary"].includes(action)){
     return Response.json({error:"Unsupported AI action."},{status:400});
   }
+  if(action==="summary"&&account.plan==="free"){
+    return Response.json({error:"AI result reports are included with Creator Pro and above.",upgradeRequired:true},{status:402});
+  }
   const isPollDraftAction=action==="create"||action==="review";
   if(isPollDraftAction&&!await consumeCredit(account,draftId)){
     return Response.json({
-      error:draftId?`You used all ${FREE_ACTIONS_PER_MONTH} free AI-assisted polls for ${account.period}. Join the AI launch list for paid access.`:"Refresh the page to start a new AI poll draft.",
+      error:draftId?`You reached your ${account.dailyLimit}/day or ${account.monthlyLimit}/month AI poll limit. Upgrade to keep building with AI; manual polls remain unlimited.`:"Refresh the page to start a new AI poll draft.",
       upgradeRequired:true,
       remaining:0,
     },{status:402});

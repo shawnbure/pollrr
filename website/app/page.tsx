@@ -25,6 +25,7 @@ export default function Home() {
           <a href="#how-it-works">How it works</a>
           <a href="#why-pollrr">Why Pollrr</a>
           <a href="#for-organizations">For organizations</a>
+          <a href="/creator-pilot">Creator pilot</a>
           <a href="/journal">Journal</a>
         </nav>
         <a className="nav-cta" href={appUrl}>
@@ -215,7 +216,7 @@ export default function Home() {
           <p>Public opinion, in motion.</p>
         </div>
         <div className="footer-links">
-          <div><span>EXPLORE</span><a href="#how-it-works">How it works</a><a href="#why-pollrr">Why Pollrr</a><a href="#for-organizations">For organizations</a><a href="/journal">Journal</a></div>
+          <div><span>EXPLORE</span><a href="#how-it-works">How it works</a><a href="#why-pollrr">Why Pollrr</a><a href="#for-organizations">For organizations</a><a href="/creator-pilot">Creator pilot</a><a href="/journal">Journal</a></div>
           <div><span>LEGAL</span><a href={`${appUrl}/privacy`}>Privacy</a><a href={`${appUrl}/terms`}>Terms</a></div>
           <div><span>CONNECT</span><a href="mailto:hello@pollrr.com">hello@pollrr.com</a><a href={appUrl}>Open the app ↗</a></div>
         </div>

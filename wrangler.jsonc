@@ -1,10 +1,11 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "pollrr",
-  "main": "dist/server/index.js",
+  "main": "worker/index.ts",
   "compatibility_date": "2026-07-28",
-  "compatibility_flags": ["nodejs_compat"],
-  "account_id": "485a8b721eeb6afa98c6e4071b50fe04",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "assets": {
     "directory": "dist/client",
     "binding": "ASSETS"
@@ -12,47 +13,12 @@
   "ai": {
     "binding": "AI"
   },
-  "env": {
-    "production": {
-      "name": "pollrr-production",
-      "ai": {
-        "binding": "AI"
-      },
-      "vars": {
-        "LEDGER_PUBLIC_KEY": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAER9QNpnluBp4Dq6bcxrlOTOBfH0LylGCwMuNVFhpqdDhZDgqQHz+HxOej5xYCTq1Q30b4t4tnHsH+nMBAvSbS0A=="
-      },
-      "routes": [
-        { "pattern": "pollrr.ai", "custom_domain": true },
-        { "pattern": "app.pollrr.ai", "custom_domain": true },
-        { "pattern": "app.pollrr.com", "custom_domain": true }
-      ],
-      "d1_databases": [
-        {
-          "binding": "DB",
-          "database_name": "pollrr-production",
-          "database_id": "e8df7a20-360c-4f25-b422-6c64e55f7fe6"
-        }
-      ]
-    },
-    "development": {
-      "name": "pollrr-development",
-      "ai": {
-        "binding": "AI"
-      },
-      "vars": {
-        "LEDGER_PUBLIC_KEY": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAER9QNpnluBp4Dq6bcxrlOTOBfH0LylGCwMuNVFhpqdDhZDgqQHz+HxOej5xYCTq1Q30b4t4tnHsH+nMBAvSbS0A=="
-      },
-      "routes": [
-        { "pattern": "dev.pollrr.ai", "custom_domain": true },
-        { "pattern": "dev.pollrr.com", "custom_domain": true }
-      ],
-      "d1_databases": [
-        {
-          "binding": "DB",
-          "database_name": "pollrr-development",
-          "database_id": "9899f0ec-1e62-4780-b936-2073e5cd7f25"
-        }
-      ]
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pollrr",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "drizzle"
     }
-  }
+  ]
 }

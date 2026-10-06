@@ -372,14 +372,15 @@ function Landing() {
   return <main className="landing-shell">
     <header className="landing-nav">
       <Link className="brand" href="/" aria-label="Pollrr home"><span className="brand-mark">p</span><span>pollrr</span></Link>
-      <Link className="landing-login" href="/login">My polls</Link>
+      <div><Link className="landing-plans" href="/studio?start=plans">Plans</Link><Link className="landing-login" href="/login">Sign in</Link></div>
     </header>
     <section className="landing-hero">
       <p className="eyebrow">FREE · NO SIGN-UP TO START</p>
       <h1>Ask one question.<br/>Share one link.</h1>
       <p>Create a beautiful poll in seconds. Friends answer with one tap, then everyone sees the split.</p>
       <Link className="landing-primary" href="/studio?start=create">Create a poll <span>→</span></Link>
-      <small>Your private creator account starts automatically.</small>
+      <small>Your free creator account starts automatically. No card required.</small>
+      <Link className="landing-claim" href="/studio?start=claim">Already started? Secure your account →</Link>
     </section>
     <section className="landing-steps" aria-label="How Pollrr works">
       <article><span>1</span><b>Write your question</b><small>Two choices. Nothing complicated.</small></article>
