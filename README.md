@@ -1,6 +1,6 @@
 # Pollrr
 
-**A self-hostable polling app for creating questions, sharing polls, collecting human responses, and explaining the results.**
+**[https://pollrr.ai](https://pollrr.ai)** — pollrr.ai is an open-source, self-hostable polling app on Cloudflare: ask one question, share one link, see the split, with verifiable result receipts.
 
 [![Deploy To Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/shawnbure/pollrr)
 
