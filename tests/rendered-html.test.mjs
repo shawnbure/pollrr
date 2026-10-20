@@ -14,6 +14,10 @@ test("finished Pollrr experience replaces the disposable starter", async () => {
   assert.match(page, /Vote to reveal the live split/);
   assert.match(page, /Ask one question/);
   assert.match(page, /Create a poll/);
+  assert.match(page, /Open source on Cloudflare/);
+  assert.match(page, /https:\/\/github\.com\/shawnbure\/pollrr/);
+  assert.match(page, /https:\/\/workrr\.ai/);
+  assert.match(await readFile(new URL("../app/methodology/page.tsx", import.meta.url), "utf8"), /pollrr runs on Cloudflare Workers with D1 for records and Workers AI for drafting help/);
   assert.match(page, /Verify this result/);
   assert.match(page, /private-map/);
   assert.match(layout, /Pollrr/);
