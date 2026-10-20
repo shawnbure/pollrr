@@ -34,7 +34,9 @@ npm test
 From the repository root, after the change is merged:
 
 ```sh
-npm ci && npm run build && npx wrangler deploy --env production
+npm ci && npm run build && npx wrangler deploy --config wrangler.jsonc --env production
 ```
 
-`--env production` publishes Worker `pollrr-production` with that environment's routes and D1 database. Deploying without `--env production` publishes the top-level Worker `pollrr` instead, which has no production routes or database. This command does not apply D1 migrations: the production database binding has no `migrations_dir`.
+`npm run build` writes `.wrangler/deploy/config.json`. A bare `wrangler deploy` follows that file, and the generated config is the local Vite binding (`site-creator-d1`, Worker name `pollrr`), not production. `--config wrangler.jsonc` skips the redirect.
+
+`--env production` publishes Worker `pollrr-production` with that environment's routes (`pollrr.ai`, `app.pollrr.ai`, `app.pollrr.com`) and D1 database `pollrr-production`. Deploying without `--env production` publishes the top-level Worker `pollrr` instead. This command does not apply D1 migrations: the production database binding has no `migrations_dir`.
