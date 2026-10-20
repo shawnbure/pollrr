@@ -387,6 +387,6 @@ function Landing() {
       <article><span>2</span><b>Share anywhere</b><small>Text, Instagram, TikTok, YouTube, or anywhere links work.</small></article>
       <article><span>3</span><b>Watch the ripple</b><small>See answers, friend challenges, and a verifiable record.</small></article>
     </section>
-    <footer className="landing-footer"><span>Human answers. Verifiable results.</span><nav><Link href="/methodology">Methodology</Link><Link href="/privacy">Privacy</Link></nav></footer>
+    <footer className="landing-footer"><span>Human answers. Verifiable results. Open source on Cloudflare.</span><nav><Link href="/methodology">Methodology</Link><Link href="/privacy">Privacy</Link><a href="https://github.com/shawnbure/pollrr">Source</a><a href="https://workrr.ai">Built by workrr.ai</a></nav></footer>
   </main>;
 }

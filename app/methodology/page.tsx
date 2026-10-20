@@ -13,6 +13,7 @@ export default async function MethodologyPage() {
       <article>
         <p className="eyebrow">METHODOLOGY · VERSION {method?.version ?? "—"}</p>
         <h1>Exactly what the numbers mean.</h1>
+        <p>pollrr runs on Cloudflare Workers with D1 for records and Workers AI for drafting help.</p>
         <h2>Raw human result</h2><p>{method?.sampling_method}</p>
         <h2>Integrity view</h2><p>{method?.integrity_method}</p>
         <h2>Qualitative explanations</h2><p>{method?.explanation_method}</p>
